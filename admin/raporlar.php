@@ -634,7 +634,7 @@ $logoSrc = '../' . $rawLogoPath;
                         <h3 style="font-size: 1.05rem; font-weight: 800; margin: 0 0 4px 0; color: #2563eb;"><?php echo e($compName); ?></h3>
                         <div>Tel: <?php echo e($companyPhone); ?></div>
                         <div>E-posta: <?php echo e($companyEmail); ?></div>
-                        <div style="max-width: 250px; font-size: 0.72rem; color: #64748b; margin-top: 2px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="<?php echo e($companyAddress); ?>"><?php echo e($companyAddress); ?></div>
+                        <div style="max-width: 320px; font-size: 0.72rem; color: #64748b; margin-top: 2px; word-wrap: break-word; text-align: right; line-height: 1.35; white-space: normal;" title="<?php echo e($companyAddress); ?>"><?php echo e($companyAddress); ?></div>
                     </div>
                 </div>
                 
@@ -806,7 +806,7 @@ function downloadPDF() {
     if (marginGuide) marginGuide.style.display = 'none';
     
     const opt = {
-        margin:       10,
+        margin:       0,
         filename:     'puantaj_raporu_<?php echo str_replace("-", "_", $periodType === "weekly" ? $selectedWeek : $selectedMonth); ?>.pdf',
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2, useCORS: true, logging: false },
