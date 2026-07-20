@@ -539,12 +539,7 @@ function renderEmployeeSelection(date, timeSlot, job) {
     const listContainer = document.getElementById("employeeSelectionList");
     listContainer.innerHTML = "";
     
-    const isWeekly = !!job.package_id;
-    const durationWeeks = parseInt(job.duration_weeks) || 1;
-    const daysCount = parseInt(document.getElementById("edit_service_days").value) || 1;
-    const startDate = document.getElementById("edit_date").value;
-    
-    const datesToCheck = getBookingDates(startDate, daysCount, isWeekly, durationWeeks);
+    const datesToCheck = [date];
     
     activeEmployees.forEach(emp => {
         const empId = parseInt(emp.id);
@@ -794,8 +789,7 @@ function openDragDropModal(jobId, customerName, originalTimeSlot, bookingId, ser
     document.getElementById("drag_info_date").innerText = `${parts[2]}.${parts[1]}.${parts[0]}`;
     document.getElementById("drag_info_employee").innerText = targetEmployeeName;
     
-    const isWeekly = !!packageId;
-    const datesToCheck = getBookingDates(targetDate, serviceDays, isWeekly, durationWeeks);
+    const datesToCheck = [targetDate];
     
     const slots = ['08-17', '08-12', '13-17'];
     const slotAvailability = {

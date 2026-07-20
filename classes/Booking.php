@@ -430,10 +430,10 @@ class Booking {
                 $newStatus = 'confirmed';
             }
             
-            // 2. Update bookings (customer_name, customer_phone, customer_address, person_count, service_days, total_price, category_id, subcategory_id, booking_date, booking_time_slot, status)
+            // 2. Update bookings (customer_name, customer_phone, customer_address, person_count, service_days, total_price, category_id, subcategory_id, status)
             $stmt = $this->db->prepare("
                 UPDATE bookings 
-                SET customer_name = ?, customer_phone = ?, customer_address = ?, person_count = ?, service_days = ?, total_price = ?, category_id = ?, subcategory_id = ?, booking_date = ?, booking_time_slot = ?, status = ?
+                SET customer_name = ?, customer_phone = ?, customer_address = ?, person_count = ?, service_days = ?, total_price = ?, category_id = ?, subcategory_id = ?, status = ?
                 WHERE id = ?
             ");
             $stmt->execute([
@@ -445,13 +445,20 @@ class Booking {
                 $totalPrice,
                 $data['category_id'],
                 $data['subcategory_id'] ?: null,
-                $data['date'], // Yeni başlangıç tarihi
-                $data['time_slot'], // Yeni saat dilimi
                 $newStatus,
                 $bookingId
             ]);
             
-            // Takvim oturumlarını senkronize et
+            // 3. Update ONLY the target schedule slot
+            $stmtUpd = $this->db->prepare("UPDATE booking_schedule SET date = ?, time_slot = ?, status = ? WHERE id = ?");
+            $stmtUpd->execute([
+                $data['date'],
+                $data['time_slot'],
+                $newStatus,
+                $scheduleId
+            ]);
+            
+            // 4. Adjust the number of schedule rows if they changed service_days or package
             $isWeekly = !empty($orig['package_id']);
             $requiredCount = 1;
             if ($isWeekly) {
@@ -462,28 +469,28 @@ class Booking {
                 $requiredCount = (int)($data['service_days'] ?? 1);
             }
             
-            $stmt = $this->db->prepare("SELECT id FROM booking_schedule WHERE booking_id = ? ORDER BY date ASC");
+            $stmt = $this->db->prepare("SELECT id, date FROM booking_schedule WHERE booking_id = ? ORDER BY date ASC, id ASC");
             $stmt->execute([$bookingId]);
             $schedules = $stmt->fetchAll();
             $currentCount = count($schedules);
             
-            for ($i = 0; $i < $requiredCount; $i++) {
-                if ($isWeekly) {
-                    $occDate = date('Y-m-d', strtotime("+$i weeks", strtotime($data['date'])));
-                } else {
-                    $occDate = date('Y-m-d', strtotime("+$i days", strtotime($data['date'])));
+            if ($currentCount < $requiredCount) {
+                // Add new slots without shifting the existing ones
+                $maxDate = $data['date'];
+                foreach ($schedules as $sch) {
+                    if ($sch['date'] > $maxDate) {
+                        $maxDate = $sch['date'];
+                    }
                 }
                 
-                if ($i < $currentCount) {
-                    $schId = $schedules[$i]['id'];
-                    $stmtUpd = $this->db->prepare("UPDATE booking_schedule SET date = ?, time_slot = ?, status = ? WHERE id = ?");
-                    $stmtUpd->execute([
-                        $occDate,
-                        $data['time_slot'],
-                        $newStatus,
-                        $schId
-                    ]);
-                } else {
+                for ($i = $currentCount; $i < $requiredCount; $i++) {
+                    $offset = $i - $currentCount + 1;
+                    if ($isWeekly) {
+                        $occDate = date('Y-m-d', strtotime("+$offset weeks", strtotime($maxDate)));
+                    } else {
+                        $occDate = date('Y-m-d', strtotime("+$offset days", strtotime($maxDate)));
+                    }
+                    
                     $stmtIns = $this->db->prepare("INSERT INTO booking_schedule (booking_id, date, time_slot, status) VALUES (?, ?, ?, ?)");
                     $stmtIns->execute([
                         $bookingId,
@@ -492,36 +499,50 @@ class Booking {
                         $newStatus
                     ]);
                 }
-            }
-            
-            if ($currentCount > $requiredCount) {
-                for ($i = $requiredCount; $i < $currentCount; $i++) {
-                    $schId = $schedules[$i]['id'];
-                    $stmtDel = $this->db->prepare("DELETE FROM booking_schedule WHERE id = ?");
-                    $stmtDel->execute([$schId]);
-                }
-            }
-            
-            // Tüm takvim günlerinin id listesini çek ve hepsine seçili personelleri ata
-            $stmtSch = $this->db->prepare("SELECT id FROM booking_schedule WHERE booking_id = ?");
-            $stmtSch->execute([$bookingId]);
-            $allBookingSchedules = $stmtSch->fetchAll(PDO::FETCH_COLUMN);
-            
-            if (!empty($allBookingSchedules)) {
-                // Mevcut tüm atamaları sil
-                $inClause = implode(',', array_fill(0, count($allBookingSchedules), '?'));
-                $stmtDel = $this->db->prepare("DELETE FROM booking_employees WHERE booking_schedule_id IN ($inClause)");
-                $stmtDel->execute($allBookingSchedules);
+            } elseif ($currentCount > $requiredCount) {
+                // Delete excess slots from the end
+                $deletedCount = 0;
+                $toDelete = $currentCount - $requiredCount;
                 
-                // Eğer çalışan seçildiyse, tüm günlere ata
-                if (!empty($employeeIds)) {
-                    $stmtAssign = $this->db->prepare("INSERT INTO booking_employees (booking_schedule_id, employee_id) VALUES (?, ?)");
-                    foreach ($allBookingSchedules as $schId) {
-                        foreach ($employeeIds as $empId) {
-                            $stmtAssign->execute([$schId, $empId]);
-                        }
+                // Fetch schedule IDs in descending order of date to delete the latest ones
+                $stmtDesc = $this->db->prepare("SELECT id FROM booking_schedule WHERE booking_id = ? ORDER BY date DESC, id DESC");
+                $stmtDesc->execute([$bookingId]);
+                $descSchedules = $stmtDesc->fetchAll(PDO::FETCH_COLUMN);
+                
+                foreach ($descSchedules as $schIdToDelete) {
+                    if ($deletedCount >= $toDelete) {
+                        break;
+                    }
+                    if ($schIdToDelete != $scheduleId) {
+                        $stmtDel = $this->db->prepare("DELETE FROM booking_schedule WHERE id = ?");
+                        $stmtDel->execute([$schIdToDelete]);
+                        $deletedCount++;
                     }
                 }
+            }
+            
+            // 5. Update employee assignments ONLY for the target schedule slot
+            $stmtDelEmp = $this->db->prepare("DELETE FROM booking_employees WHERE booking_schedule_id = ?");
+            $stmtDelEmp->execute([$scheduleId]);
+            
+            if (!empty($employeeIds)) {
+                $stmtAssign = $this->db->prepare("INSERT INTO booking_employees (booking_schedule_id, employee_id) VALUES (?, ?)");
+                foreach ($employeeIds as $empId) {
+                    $stmtAssign->execute([$scheduleId, $empId]);
+                }
+            }
+            
+            // 6. Update the main booking's booking_date and booking_time_slot to match the first (earliest) schedule slot's date and time_slot
+            $stmtFirst = $this->db->prepare("SELECT date, time_slot FROM booking_schedule WHERE booking_id = ? ORDER BY date ASC, id ASC LIMIT 1");
+            $stmtFirst->execute([$bookingId]);
+            $firstSchedule = $stmtFirst->fetch(PDO::FETCH_ASSOC);
+            if ($firstSchedule) {
+                $stmtMainDate = $this->db->prepare("UPDATE bookings SET booking_date = ?, booking_time_slot = ? WHERE id = ?");
+                $stmtMainDate->execute([
+                    $firstSchedule['date'],
+                    $firstSchedule['time_slot'],
+                    $bookingId
+                ]);
             }
             
             $this->db->commit();
