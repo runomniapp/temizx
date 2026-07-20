@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/Employee.php';
+require_once __DIR__ . '/Category.php';
 
 class Booking {
     private $db;
