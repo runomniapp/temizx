@@ -326,17 +326,18 @@ $logoSrc = '../' . $rawLogoPath;
     position: relative;
     width: 297mm;
     min-height: 210mm;
-    padding: 15mm;
+    padding: 10mm;
     border: 1px solid #cbd5e1;
+    page-break-inside: avoid;
 }
 
 /* Visual margin guide (dashed borders) inside the preview, hidden in print */
 .margin-guide {
     position: absolute;
-    top: 15mm;
-    left: 15mm;
-    right: 15mm;
-    bottom: 15mm;
+    top: 10mm;
+    left: 10mm;
+    right: 10mm;
+    bottom: 10mm;
     border: 1px dashed rgba(37, 99, 235, 0.2);
     pointer-events: none;
 }
@@ -347,6 +348,10 @@ $logoSrc = '../' . $rawLogoPath;
     border-collapse: collapse;
     margin-top: 25px;
     font-size: 0.72rem;
+}
+
+.report-table tr {
+    page-break-inside: avoid;
 }
 
 .report-table th, .report-table td {
@@ -372,17 +377,19 @@ $logoSrc = '../' . $rawLogoPath;
 /* Badges for Shifts in Table */
 .shift-cell {
     font-weight: 800;
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     padding: 0 !important;
+    line-height: 22px;
 }
 
 .shift-val {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    display: block;
+    text-align: center;
     width: 100%;
     height: 100%;
+    box-sizing: border-box;
+    border-radius: 4px;
 }
 
 .shift-val.full-day {
@@ -413,16 +420,9 @@ $logoSrc = '../' . $rawLogoPath;
 }
 
 /* Report Footer / Signature Section */
-.report-signatures {
-    margin-top: 40px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 100px;
-}
-
-.sig-box {
-    border-top: 1px solid #94a3b8;
-    padding-top: 8px;
+.sig-box-td {
+    border-top: 1px solid #94a3b8 !important;
+    padding-top: 8px !important;
     text-align: center;
     font-size: 0.8rem;
     color: #334155;
@@ -440,16 +440,13 @@ $logoSrc = '../' . $rawLogoPath;
 }
 
 .legend-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
     margin-top: 6px;
 }
 
 .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: inline-block;
+    margin-right: 25px;
+    vertical-align: middle;
 }
 
 .legend-badge {
@@ -504,7 +501,7 @@ $logoSrc = '../' . $rawLogoPath;
     
     @page {
         size: landscape;
-        margin: 1.5cm;
+        margin: 0;
     }
 }
 </style>
@@ -614,29 +611,39 @@ $logoSrc = '../' . $rawLogoPath;
                 <div class="margin-guide no-print"></div>
                 
                 <!-- Report Header -->
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e293b; padding-bottom: 15px;">
-                    <div style="display: flex; align-items: center; gap: 18px;">
-                        <?php if (file_exists('../' . $rawLogoPath)): ?>
-                            <img src="../<?php echo e($rawLogoPath); ?>" alt="Logo" style="max-height: 52px; max-width: 140px; object-fit: contain;">
-                        <?php else: ?>
-                            <div style="width: 50px; height: 50px; background-color: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 800; border-radius: 12px; font-size: 1.2rem;">O</div>
-                        <?php endif; ?>
-                        <div>
-                            <h1 style="font-size: 1.3rem; font-weight: 800; margin: 0; color: #0f172a; text-transform: uppercase;">
-                                <?php echo $periodType === 'weekly' ? 'HAFTALIK' : 'AYLIK'; ?> ÇALIŞAN PUANTAJ RAPORU
-                            </h1>
-                            <p style="font-size: 0.8rem; color: #475569; margin: 3px 0 0 0; font-weight: 500;">
-                                Dönem: <strong><?php echo formatTurkishDate($startDate); ?></strong> ile <strong><?php echo formatTurkishDate($endDate); ?></strong> arası
-                            </p>
-                        </div>
-                    </div>
-                    <div style="text-align: right; font-size: 0.78rem; color: #475569; line-height: 1.45;">
-                        <h3 style="font-size: 1.05rem; font-weight: 800; margin: 0 0 4px 0; color: #2563eb;"><?php echo e($compName); ?></h3>
-                        <div>Tel: <?php echo e($companyPhone); ?></div>
-                        <div>E-posta: <?php echo e($companyEmail); ?></div>
-                        <div style="max-width: 320px; font-size: 0.72rem; color: #64748b; margin-top: 2px; word-wrap: break-word; text-align: right; line-height: 1.35; white-space: normal;" title="<?php echo e($companyAddress); ?>"><?php echo e($companyAddress); ?></div>
-                    </div>
-                </div>
+                <table style="width: 100%; border-collapse: collapse; border-bottom: 2px solid #1e293b; padding-bottom: 12px; margin-bottom: 15px; border: none !important;" class="no-print-border">
+                    <tr style="border: none !important;">
+                        <!-- Left Logo & Title -->
+                        <td style="text-align: left; vertical-align: middle; border: none !important; padding: 0;">
+                            <table style="border: none !important; border-collapse: collapse; width: auto;">
+                                <tr style="border: none !important;">
+                                    <td style="border: none !important; padding: 0; padding-right: 15px; vertical-align: middle;">
+                                        <?php if (file_exists('../' . $rawLogoPath)): ?>
+                                            <img src="../<?php echo e($rawLogoPath); ?>" alt="Logo" style="max-height: 52px; max-width: 140px; object-fit: contain;">
+                                        <?php else: ?>
+                                            <div style="width: 50px; height: 50px; background-color: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 800; border-radius: 12px; font-size: 1.2rem;">O</div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td style="border: none !important; padding: 0; vertical-align: middle;">
+                                        <h1 style="font-size: 1.3rem; font-weight: 800; margin: 0; color: #0f172a; text-transform: uppercase;">
+                                            <?php echo $periodType === 'weekly' ? 'HAFTALIK' : 'AYLIK'; ?> ÇALIŞAN PUANTAJ RAPORU
+                                        </h1>
+                                        <p style="font-size: 0.8rem; color: #475569; margin: 3px 0 0 0; font-weight: 500;">
+                                            Dönem: <strong><?php echo formatTurkishDate($startDate); ?></strong> ile <strong><?php echo formatTurkishDate($endDate); ?></strong> arası
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                        <!-- Right Company Info -->
+                        <td style="text-align: right; vertical-align: middle; border: none !important; padding: 0; font-size: 0.78rem; color: #475569; line-height: 1.45; width: 320px;">
+                            <h3 style="font-size: 1.05rem; font-weight: 800; margin: 0 0 4px 0; color: #2563eb;"><?php echo e($compName); ?></h3>
+                            <div>Tel: <?php echo e($companyPhone); ?></div>
+                            <div>E-posta: <?php echo e($companyEmail); ?></div>
+                            <div style="max-width: 320px; font-size: 0.72rem; color: #64748b; margin-top: 2px; word-wrap: break-word; text-align: right; line-height: 1.35; white-space: normal; display: inline-block;" title="<?php echo e($companyAddress); ?>"><?php echo e($companyAddress); ?></div>
+                        </td>
+                    </tr>
+                </table>
                 
                 <!-- Info Grid -->
                 <div style="margin-top: 15px; display: flex; justify-content: space-between; font-size: 0.78rem; color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
@@ -722,18 +729,21 @@ $logoSrc = '../' . $rawLogoPath;
                 </div>
 
                 <!-- Signature Section -->
-                <div class="report-signatures">
-                    <div class="sig-box">
-                        <strong>Raporu Hazırlayan</strong>
-                        <div style="margin-top: 45px; font-weight: 700; color: #0f172a;" id="preview_owner_name"><?php echo e($ownerName); ?></div>
-                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 3px;">İşletme Sahibi</div>
-                    </div>
-                    <div class="sig-box">
-                        <strong>Onaylayan Yetkili</strong>
-                        <div style="margin-top: 45px; font-weight: 700; color: #0f172a;" id="preview_approver_name"><?php echo e($approverName); ?></div>
-                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 3px;">İmza / Kaşe</div>
-                    </div>
-                </div>
+                <table style="width: 100%; margin-top: 40px; border-collapse: collapse; border: none !important;" class="no-print-border">
+                    <tr style="border: none !important;">
+                        <td style="width: 42%; border: none !important; padding: 0;" class="sig-box-td">
+                            <strong>Raporu Hazırlayan</strong>
+                            <div style="margin-top: 45px; font-weight: 700; color: #0f172a;" id="preview_owner_name"><?php echo e($ownerName); ?></div>
+                            <div style="font-size: 0.72rem; color: #64748b; margin-top: 3px;">İşletme Sahibi</div>
+                        </td>
+                        <td style="width: 16%; border: none !important; padding: 0;"></td>
+                        <td style="width: 42%; border: none !important; padding: 0;" class="sig-box-td">
+                            <strong>Onaylayan Yetkili</strong>
+                            <div style="margin-top: 45px; font-weight: 700; color: #0f172a;" id="preview_approver_name"><?php echo e($approverName); ?></div>
+                            <div style="font-size: 0.72rem; color: #64748b; margin-top: 3px;">İmza / Kaşe</div>
+                        </td>
+                    </tr>
+                </table>
 
             </div>
         </div>
