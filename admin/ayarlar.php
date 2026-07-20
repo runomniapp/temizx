@@ -22,7 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'facebook'         => $_POST['facebook'] ?? '',
             'instagram'        => $_POST['instagram'] ?? '',
             'footer_text'      => $_POST['footer_text'] ?? '',
-            'maps_iframe'      => $_POST['maps_iframe'] ?? ''
+            'maps_iframe'      => $_POST['maps_iframe'] ?? '',
+            'owner_name'       => $_POST['owner_name'] ?? '',
+            'approver_name'    => $_POST['approver_name'] ?? ''
         ];
         
         $settingModel->updateMany($textSettings);
@@ -96,6 +98,17 @@ $allSettings = $settingModel->getAll();
                 <div class="form-group">
                     <label class="form-label" for="work_hours">Çalışma Saatleri</label>
                     <input type="text" name="work_hours" id="work_hours" class="form-control" value="<?php echo e($allSettings['work_hours'] ?? ''); ?>">
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="owner_name">İşletme Sahibi Ad Soyad</label>
+                    <input type="text" name="owner_name" id="owner_name" class="form-control" value="<?php echo e($allSettings['owner_name'] ?? ''); ?>">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="approver_name">Onay Personeli Ad Soyad</label>
+                    <input type="text" name="approver_name" id="approver_name" class="form-control" value="<?php echo e($allSettings['approver_name'] ?? ''); ?>">
                 </div>
             </div>
             

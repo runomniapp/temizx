@@ -146,42 +146,25 @@ function getTurkishDayNameShort($dateStr) {
     return $days[$dayOfWeek] ?? '';
 }
 
-function getTurkishMonthName($dateStr) {
-    $monthNum = (int)date('m', strtotime($dateStr));
-    $months = [
-        1 => 'Ocak', 2 => 'Şubat', 3 => 'Mart', 4 => 'Nisan',
-        5 => 'Mayıs', 6 => 'Haziran', 7 => 'Temmuz', 8 => 'Ağustos',
-        9 => 'Eylül', 10 => 'Ekim', 11 => 'Kasım', 12 => 'Aralık'
-    ];
-    return $months[$monthNum] ?? '';
-}
+// Settings fetch values
+$companyPhone = getSetting('phone', '-');
+$companyEmail = getSetting('email', '-');
+$companyAddress = getSetting('address', '-');
+$ownerName = getSetting('owner_name', $compName);
+$approverName = getSetting('approver_name', 'Onay Personeli');
+$rawLogoPath = getSetting('logo_path', 'assets/img/olifa_logo.png');
+
+// Check if logo exists, prep for base64 or absolute path to avoid PDF rendering issues
+$logoSrc = '../' . $rawLogoPath;
 ?>
 
-<!-- Dynamic Print Page Styling -->
-<?php if ($periodType === 'monthly'): ?>
-<style>
-@media print {
-    @page {
-        size: landscape;
-        margin: 1cm;
-    }
-}
-</style>
-<?php else: ?>
-<style>
-@media print {
-    @page {
-        size: portrait;
-        margin: 1.2cm;
-    }
-}
-</style>
-<?php endif; ?>
+<!-- html2pdf.js library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <style>
 /* Page Layout Styles */
 .reports-container {
-    max-width: 1250px;
+    max-width: 1300px;
     margin: 0 auto;
     padding-bottom: 50px;
 }
@@ -199,7 +182,7 @@ function getTurkishMonthName($dateStr) {
 
 .filter-grid {
     display: grid;
-    grid-template-columns: 250px 1fr;
+    grid-template-columns: 320px 1fr;
     gap: 25px;
 }
 
@@ -268,7 +251,7 @@ function getTurkishMonthName($dateStr) {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 10px;
-    max-height: 180px;
+    max-height: 150px;
     overflow-y: auto;
     padding: 4px;
 }
@@ -323,86 +306,75 @@ function getTurkishMonthName($dateStr) {
     margin-bottom: 20px;
 }
 
-/* Paper A4 Sheet Preview Styling */
+/* Paper A4 Sheet Preview Styling - Always Landscape for a cleaner look */
 .report-sheet-wrapper {
     overflow-x: auto;
     background: #e2e8f0;
-    padding: 30px;
+    padding: 40px 20px;
     border-radius: var(--radius-card);
     box-shadow: inset 0 2px 8px rgba(0,0,0,0.05);
+    display: flex;
+    justify-content: center;
 }
 
 .report-sheet {
     background: #ffffff;
     color: #000000;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    margin: 0 auto;
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
     box-sizing: border-box;
     font-family: 'Inter', sans-serif;
     position: relative;
-}
-
-/* Print dimensions matching A4 standard sizes */
-.report-sheet.portrait {
-    width: 210mm;
-    min-height: 297mm;
-    padding: 20mm;
-}
-
-.report-sheet.landscape {
     width: 297mm;
     min-height: 210mm;
     padding: 15mm;
+    border: 1px solid #cbd5e1;
+}
+
+/* Visual margin guide (dashed borders) inside the preview, hidden in print */
+.margin-guide {
+    position: absolute;
+    top: 15mm;
+    left: 15mm;
+    right: 15mm;
+    bottom: 15mm;
+    border: 1px dashed rgba(37, 99, 235, 0.2);
+    pointer-events: none;
 }
 
 /* Report Table Styling */
 .report-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
-    font-size: 0.85rem;
-}
-
-.report-sheet.landscape .report-table {
-    font-size: 0.72rem; /* Shorter font size for monthly landscape to fit 31 days */
+    margin-top: 25px;
+    font-size: 0.72rem;
 }
 
 .report-table th, .report-table td {
-    border: 1px solid #cbd5e1;
+    border: 1px solid #94a3b8;
     text-align: center;
-    padding: 8px 4px;
-}
-
-.report-sheet.landscape .report-table th, 
-.report-sheet.landscape .report-table td {
-    padding: 4px 2px;
+    padding: 6px 3px;
 }
 
 .report-table th {
     background-color: #f1f5f9;
     font-weight: 700;
-    color: #1e293b;
+    color: #0f172a;
 }
 
 .report-table td.emp-name {
     text-align: left;
     padding-left: 10px;
     font-weight: 600;
-    color: #1e293b;
+    color: #0f172a;
     white-space: nowrap;
 }
 
 /* Badges for Shifts in Table */
 .shift-cell {
     font-weight: 800;
-    width: 26px;
-    height: 26px;
-    padding: 0 !important;
-}
-
-.report-sheet.landscape .shift-cell {
     width: 20px;
     height: 20px;
+    padding: 0 !important;
 }
 
 .shift-val {
@@ -411,7 +383,6 @@ function getTurkishMonthName($dateStr) {
     justify-content: center;
     width: 100%;
     height: 100%;
-    border-radius: 4px;
 }
 
 .shift-val.full-day {
@@ -430,7 +401,7 @@ function getTurkishMonthName($dateStr) {
 }
 
 .shift-val.empty {
-    color: #94a3b8;
+    color: #cbd5e1;
     font-weight: 400;
 }
 
@@ -443,28 +414,28 @@ function getTurkishMonthName($dateStr) {
 
 /* Report Footer / Signature Section */
 .report-signatures {
-    margin-top: 50px;
+    margin-top: 40px;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 50px;
+    gap: 100px;
 }
 
 .sig-box {
-    border-top: 1px dashed #94a3b8;
-    padding-top: 10px;
+    border-top: 1px solid #94a3b8;
+    padding-top: 8px;
     text-align: center;
-    font-size: 0.85rem;
-    color: #475569;
+    font-size: 0.8rem;
+    color: #334155;
 }
 
 /* Report Legend Styling */
 .report-legend {
-    margin-top: 35px;
+    margin-top: 30px;
     background-color: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
-    padding: 15px;
-    font-size: 0.8rem;
+    padding: 12px;
+    font-size: 0.75rem;
     color: #475569;
 }
 
@@ -472,7 +443,7 @@ function getTurkishMonthName($dateStr) {
     display: flex;
     flex-wrap: wrap;
     gap: 20px;
-    margin-top: 8px;
+    margin-top: 6px;
 }
 
 .legend-item {
@@ -483,50 +454,57 @@ function getTurkishMonthName($dateStr) {
 
 .legend-badge {
     display: inline-block;
-    padding: 2px 8px;
+    padding: 1px 6px;
     border-radius: 4px;
     font-weight: 800;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
 }
 
-/* Print CSS Configurations */
+/* Native Print Layout configuration */
 @media print {
-    body {
-        background: white !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-    
-    /* Hide all admin sidebar, header, footer and controls */
+    /* Hide layout wrappers */
     .admin-sidebar,
     .admin-header,
     .wave-bg-container,
     .page-header,
     .filter-card,
     .preview-header,
-    .report-sheet-wrapper {
+    .no-print {
         display: none !important;
     }
     
-    /* Make print area visible and occupies full page */
-    .print-area-target {
-        display: block !important;
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        margin: 0;
-        padding: 0;
+    body {
+        background: white !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    .admin-main {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+    }
+    
+    .report-sheet-wrapper {
+        background: transparent !important;
+        padding: 0 !important;
         box-shadow: none !important;
-        border: none !important;
+        overflow: visible !important;
+        display: block !important;
     }
     
     .report-sheet {
         box-shadow: none !important;
         border: none !important;
         padding: 0 !important;
+        margin: 0 !important;
         width: 100% !important;
         min-height: auto !important;
+    }
+    
+    @page {
+        size: landscape;
+        margin: 1.5cm;
     }
 }
 </style>
@@ -536,11 +514,11 @@ function getTurkishMonthName($dateStr) {
     <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
         <div>
             <h2 style="font-size: 1.8rem; font-weight: 800; margin-bottom: 5px;">Puantaj & Çalışma Raporları</h2>
-            <p style="color: var(--text-muted);">Çalışanların haftalık veya aylık puantaj cetvellerini görüntüleyin, önizleyin ve PDF olarak yazdırın.</p>
+            <p style="color: var(--text-muted);">Çalışanların haftalık veya aylık puantaj cetvellerini görüntüleyin, önizleyin ve PDF olarak indirin.</p>
         </div>
     </div>
 
-    <!-- Filter Form -->
+    <!-- Filter Form & Setup Card -->
     <div class="filter-card">
         <form method="GET" action="raporlar.php" id="filterForm">
             <div class="filter-grid">
@@ -568,6 +546,18 @@ function getTurkishMonthName($dateStr) {
                         <label class="form-label" for="month_picker" style="font-weight: 700; margin-bottom: 6px; font-size: 0.85rem; display: block;">Ay Seçin</label>
                         <input type="month" name="month" id="month_picker" class="form-control" value="<?php echo $selectedMonth; ?>" style="padding: 10px 16px; border-radius: 12px; font-weight: 600; font-size: 0.9rem;">
                     </div>
+                    
+                    <!-- Dynamic Signatories Fields -->
+                    <div style="border-top: 1px solid var(--border); padding-top: 15px; display: flex; flex-direction: column; gap: 12px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="font-weight: 700; font-size: 0.85rem; margin-bottom: 4px; display: block;">Raporu Hazırlayan</label>
+                            <input type="text" id="input_owner_name" class="form-control" style="font-size: 0.85rem; padding: 8px 14px; border-radius: 10px;" value="<?php echo e($ownerName); ?>" placeholder="İşletme Sahibi Adı">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="font-weight: 700; font-size: 0.85rem; margin-bottom: 4px; display: block;">Onaylayan Yetkili</label>
+                            <input type="text" id="input_approver_name" class="form-control" style="font-size: 0.85rem; padding: 8px 14px; border-radius: 10px;" value="<?php echo e($approverName); ?>" placeholder="Onaylayan Adı">
+                        </div>
+                    </div>
                 </div>
 
                 <div class="filter-right">
@@ -592,7 +582,7 @@ function getTurkishMonthName($dateStr) {
                     
                     <div style="margin-top: auto; display: flex; justify-content: flex-end;">
                         <button type="submit" class="btn btn-primary" style="padding: 10px 24px; border-radius: 50px; font-weight: 700; font-size: 0.9rem;">
-                            <i class="fa-solid fa-file-invoice" style="margin-right: 8px;"></i> Raporu ve Önizlemeyi Güncelle
+                            <i class="fa-solid fa-sync" style="margin-right: 8px;"></i> Raporu ve Önizlemeyi Göster
                         </button>
                     </div>
                 </div>
@@ -600,44 +590,61 @@ function getTurkishMonthName($dateStr) {
         </form>
     </div>
 
-    <!-- Preview Header and Buttons -->
+    <!-- Preview Header and Action Buttons -->
     <div class="preview-header">
         <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
             <i class="fa-solid fa-eye" style="color: var(--primary);"></i> Rapor Önizlemesi
         </h3>
-        <button onclick="window.print()" class="btn btn-primary" style="padding: 8px 20px; border-radius: 50px; font-weight: 700; font-size: 0.85rem; background-color: #059669; border-color: #059669;">
-            <i class="fa-solid fa-print" style="margin-right: 8px;"></i> PDF Olarak Kaydet / Yazdır
-        </button>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="window.print()" class="btn btn-outline" style="padding: 8px 20px; border-radius: 50px; font-weight: 700; font-size: 0.85rem;">
+                <i class="fa-solid fa-print" style="margin-right: 8px;"></i> Yazdır
+            </button>
+            <button onclick="downloadPDF()" class="btn btn-primary" style="padding: 8px 20px; border-radius: 50px; font-weight: 700; font-size: 0.85rem; background-color: #2563eb; border-color: #2563eb;">
+                <i class="fa-solid fa-file-pdf" style="margin-right: 8px;"></i> PDF Olarak İndir
+            </button>
+        </div>
     </div>
 
     <!-- Sheet Wrapper -->
     <div class="report-sheet-wrapper">
         <div class="print-area-target">
-            <div class="report-sheet <?php echo $periodType; ?>">
+            <div class="report-sheet">
+                
+                <!-- Margins Visual Guide (Only in web preview, not printed/not in PDF) -->
+                <div class="margin-guide no-print"></div>
                 
                 <!-- Report Header -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1e293b; padding-bottom: 15px;">
-                    <div>
-                        <h1 style="font-size: 1.4rem; font-weight: 800; margin: 0; color: #1e293b; text-transform: uppercase;">
-                            <?php echo $periodType === 'weekly' ? 'HAFTALIK' : 'AYLIK'; ?> ÇALIŞAN PUANTAJ RAPORU
-                        </h1>
-                        <p style="font-size: 0.85rem; color: #475569; margin: 5px 0 0 0; font-weight: 500;">
-                            Dönem: <strong><?php echo formatTurkishDate($startDate); ?></strong> ile <strong><?php echo formatTurkishDate($endDate); ?></strong> arası
-                        </p>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e293b; padding-bottom: 15px;">
+                    <div style="display: flex; align-items: center; gap: 18px;">
+                        <?php if (file_exists('../' . $rawLogoPath)): ?>
+                            <img src="../<?php echo e($rawLogoPath); ?>" alt="Logo" style="max-height: 52px; max-width: 140px; object-fit: contain;">
+                        <?php else: ?>
+                            <div style="width: 50px; height: 50px; background-color: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 800; border-radius: 12px; font-size: 1.2rem;">O</div>
+                        <?php endif; ?>
+                        <div>
+                            <h1 style="font-size: 1.3rem; font-weight: 800; margin: 0; color: #0f172a; text-transform: uppercase;">
+                                <?php echo $periodType === 'weekly' ? 'HAFTALIK' : 'AYLIK'; ?> ÇALIŞAN PUANTAJ RAPORU
+                            </h1>
+                            <p style="font-size: 0.8rem; color: #475569; margin: 3px 0 0 0; font-weight: 500;">
+                                Dönem: <strong><?php echo formatTurkishDate($startDate); ?></strong> ile <strong><?php echo formatTurkishDate($endDate); ?></strong> arası
+                            </p>
+                        </div>
                     </div>
-                    <div style="text-align: right;">
-                        <h3 style="font-size: 1.1rem; font-weight: 800; margin: 0; color: #2563eb;"><?php echo e($compName); ?></h3>
-                        <p style="font-size: 0.75rem; color: #64748b; margin: 3px 0 0 0;">Yönetim ve Operasyon Paneli</p>
+                    <div style="text-align: right; font-size: 0.78rem; color: #475569; line-height: 1.45;">
+                        <h3 style="font-size: 1.05rem; font-weight: 800; margin: 0 0 4px 0; color: #2563eb;"><?php echo e($compName); ?></h3>
+                        <div>Tel: <?php echo e($companyPhone); ?></div>
+                        <div>E-posta: <?php echo e($companyEmail); ?></div>
+                        <div style="max-width: 250px; font-size: 0.72rem; color: #64748b; margin-top: 2px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="<?php echo e($companyAddress); ?>"><?php echo e($companyAddress); ?></div>
                     </div>
                 </div>
                 
                 <!-- Info Grid -->
-                <div style="margin-top: 15px; display: flex; justify-content: space-between; font-size: 0.8rem; color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+                <div style="margin-top: 15px; display: flex; justify-content: space-between; font-size: 0.78rem; color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
                     <div>
-                        Rapor Tarihi: <strong><?php echo date('d.m.Y H:i'); ?></strong>
+                        Rapor Oluşturma Tarihi: <strong><?php echo date('d.m.Y H:i'); ?></strong>
                     </div>
                     <div>
-                        Toplam Personel Sayısı: <strong><?php echo count($employees); ?></strong>
+                        Toplam Raporlanan Çalışan: <strong><?php echo count($employees); ?></strong>
                     </div>
                 </div>
 
@@ -645,25 +652,25 @@ function getTurkishMonthName($dateStr) {
                 <table class="report-table">
                     <thead>
                         <tr>
-                            <th style="text-align: left; padding-left: 10px;">Çalışan Adı Soyadı</th>
+                            <th style="text-align: left; padding-left: 10px; width: 180px;">Çalışan Adı Soyadı</th>
                             <?php foreach ($datesArray as $dt): ?>
                                 <th>
                                     <?php if ($periodType === 'weekly'): ?>
-                                        <div style="font-weight: 800;"><?php echo getTurkishDayNameShort($dt); ?></div>
-                                        <div style="font-size: 0.7rem; font-weight: 500; opacity: 0.8;"><?php echo date('d', strtotime($dt)); ?></div>
+                                        <div style="font-weight: 800; font-size: 0.75rem;"><?php echo getTurkishDayNameShort($dt); ?></div>
+                                        <div style="font-size: 0.65rem; font-weight: 500; opacity: 0.8;"><?php echo date('d', strtotime($dt)); ?></div>
                                     <?php else: ?>
                                         <!-- Monthly just show day numbers to save space -->
-                                        <div style="font-weight: 800;"><?php echo date('d', strtotime($dt)); ?></div>
+                                        <div style="font-weight: 800; font-size: 0.7rem;"><?php echo date('d', strtotime($dt)); ?></div>
                                     <?php endif; ?>
                                 </th>
                             <?php endforeach; ?>
-                            <th style="width: 100px;">Toplam Gün</th>
+                            <th style="width: 100px; font-size: 0.75rem;">Toplam Gün</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($employees)): ?>
                             <tr>
-                                <td colspan="<?php echo count($datesArray) + 2; ?>" style="padding: 30px; color: #64748b;">Raporlanacak çalışan bulunmamaktadır.</td>
+                                <td colspan="<?php echo count($datesArray) + 2; ?>" style="padding: 30px; color: #64748b; font-size: 0.85rem;">Raporlanacak çalışan bulunmamaktadır.</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($employees as $emp): ?>
@@ -694,7 +701,7 @@ function getTurkishMonthName($dateStr) {
 
                 <!-- Legend / Explanations -->
                 <div class="report-legend">
-                    <strong style="color: #1e293b; font-size: 0.85rem;"><i class="fa-solid fa-circle-info"></i> Açıklamalar ve Hesaplama Kuralları</strong>
+                    <strong style="color: #0f172a; font-size: 0.8rem;"><i class="fa-solid fa-circle-info"></i> Rapor Lejantı ve Hesaplama Kuralları</strong>
                     <div class="legend-grid">
                         <div class="legend-item">
                             <span class="legend-badge full-day" style="background-color: #d1fae5; color: #065f46;">T</span>
@@ -709,8 +716,8 @@ function getTurkishMonthName($dateStr) {
                             <span><strong>İki Yarım Gün:</strong> Aynı günde iki farklı yarım gün iş ataması (1.0 Gün)</span>
                         </div>
                     </div>
-                    <div style="margin-top: 10px; border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 0.75rem; color: #64748b;">
-                        * <i>Toplam Gün</i> sütunu; çalışanın ilgili dönem boyunca yaptığı tüm işlerin günlük katsayı ağırlıkları toplanarak hesaplanır.
+                    <div style="margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 0.7rem; color: #64748b;">
+                        * <i>Hesaplama:</i> Toplam Gün = T sayısı + (Y sayısı * 0.5) + (2Y sayısı * 1.0).
                     </div>
                 </div>
 
@@ -718,13 +725,13 @@ function getTurkishMonthName($dateStr) {
                 <div class="report-signatures">
                     <div class="sig-box">
                         <strong>Raporu Hazırlayan</strong>
-                        <div style="margin-top: 50px; font-weight: 600; color: #1e293b;"><?php echo e($adminUsername); ?></div>
-                        <div style="font-size: 0.75rem; color: #64748b;">Sistem Yöneticisi</div>
+                        <div style="margin-top: 45px; font-weight: 700; color: #0f172a;" id="preview_owner_name"><?php echo e($ownerName); ?></div>
+                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 3px;">İşletme Sahibi</div>
                     </div>
                     <div class="sig-box">
                         <strong>Onaylayan Yetkili</strong>
-                        <div style="margin-top: 50px; height: 16px;"></div>
-                        <div style="font-size: 0.75rem; color: #64748b;">İmza / Kaşe</div>
+                        <div style="margin-top: 45px; font-weight: 700; color: #0f172a;" id="preview_approver_name"><?php echo e($approverName); ?></div>
+                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 3px;">İmza / Kaşe</div>
                     </div>
                 </div>
 
@@ -782,7 +789,37 @@ function updateSelectAllCheckboxState() {
     selectAll.checked = allChecked;
 }
 
-// Initial update on page load
+// Live sync signatory names
+document.getElementById('input_owner_name').addEventListener('input', function() {
+    document.getElementById('preview_owner_name').innerText = this.value;
+});
+document.getElementById('input_approver_name').addEventListener('input', function() {
+    document.getElementById('preview_approver_name').innerText = this.value;
+});
+
+// PDF Generation using html2pdf.js
+function downloadPDF() {
+    const element = document.querySelector('.report-sheet');
+    
+    // Hide the margin guide and any other non-printable element inside the sheet before capturing
+    const marginGuide = element.querySelector('.margin-guide');
+    if (marginGuide) marginGuide.style.display = 'none';
+    
+    const opt = {
+        margin:       10,
+        filename:     'puantaj_raporu_<?php echo str_replace("-", "_", $periodType === "weekly" ? $selectedWeek : $selectedMonth); ?>.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    };
+    
+    html2pdf().set(opt).from(element).save().then(() => {
+        // Restore margin guide visibility after PDF generation completes
+        if (marginGuide) marginGuide.style.display = 'block';
+    });
+}
+
+// Initial updates on page load
 document.addEventListener('DOMContentLoaded', function() {
     updateSelectAllCheckboxState();
 });
