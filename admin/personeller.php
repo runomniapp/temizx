@@ -23,7 +23,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'work_hours_start' => trim($_POST['work_hours_start'] ?? '08:00:00'),
             'work_hours_end' => trim($_POST['work_hours_end'] ?? '17:00:00'),
             'off_days' => $offDaysStr,
-            'employee_type' => trim($_POST['employee_type'] ?? 'general')
+            'employee_type' => trim($_POST['employee_type'] ?? 'general'),
+            'daily_wage_full' => (float)($_POST['daily_wage_full'] ?? 0.00),
+            'daily_wage_half' => (float)($_POST['daily_wage_half'] ?? 0.00)
         ];
         
         // Fotoğraf Yükleme
@@ -90,6 +92,7 @@ $employees = $employeeModel->getAll(false);
                         <th>Adı Soyadı</th>
                         <th>Telefon</th>
                         <th>Çalışma Saatleri</th>
+                        <th>Yövmiye (Tam/Yarım)</th>
                         <th>İzin Günleri</th>
                         <th>Durum</th>
                         <th style="text-align: right;">İşlemler</th>
@@ -116,6 +119,10 @@ $employees = $employeeModel->getAll(false);
                             </td>
                             <td><code><?php echo e($row['phone']); ?></code></td>
                             <td><?php echo date('H:i', strtotime($row['work_hours_start'])); ?> - <?php echo date('H:i', strtotime($row['work_hours_end'])); ?></td>
+                            <td>
+                                <div>Tam: <strong><?php echo number_format($row['daily_wage_full'] ?? 0, 0, ',', '.'); ?> ₺</strong></div>
+                                <div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Yarım: <strong><?php echo number_format($row['daily_wage_half'] ?? 0, 0, ',', '.'); ?> ₺</strong></div>
+                            </td>
                             <td>
                                 <?php 
                                 $offs = explode(',', $row['off_days']);
@@ -214,6 +221,17 @@ $employees = $employeeModel->getAll(false);
                     </div>
                 </div>
                 
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="emp_daily_wage_full">Tam Gün Yövmiye (₺) *</label>
+                        <input type="number" step="0.01" name="daily_wage_full" id="emp_daily_wage_full" class="form-control" value="0.00" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="emp_daily_wage_half">Yarım Gün Yövmiye (₺) *</label>
+                        <input type="number" step="0.01" name="daily_wage_half" id="emp_daily_wage_half" class="form-control" value="0.00" required>
+                    </div>
+                </div>
+                
                 <div class="form-group">
                     <label class="form-label" for="emp_photo">Fotoğraf (Boş bırakılırsa mevcut kalır)</label>
                     <input type="file" name="photo_file" id="emp_photo" class="form-control" style="padding: 10px 20px;">
@@ -266,6 +284,9 @@ function openEmployeeModal(emp = null) {
             const cb = document.querySelector(`input[name="off_days[]"][value="${day}"]`);
             if (cb) cb.checked = true;
         });
+        
+        document.getElementById("emp_daily_wage_full").value = parseFloat(emp.daily_wage_full || 0).toFixed(2);
+        document.getElementById("emp_daily_wage_half").value = parseFloat(emp.daily_wage_half || 0).toFixed(2);
     } else {
         document.getElementById("empModalTitle").innerText = "Yeni Personel Ekle";
         document.getElementById("emp_id").value = "";
@@ -276,6 +297,9 @@ function openEmployeeModal(emp = null) {
         document.getElementById("emp_end").value = "17:00";
         selectEmployeeType('general');
         document.getElementById("off_Sun").checked = true; // default pazar
+        
+        document.getElementById("emp_daily_wage_full").value = "0.00";
+        document.getElementById("emp_daily_wage_half").value = "0.00";
     }
     document.getElementById("employeeModal").classList.add("active");
 }

@@ -658,10 +658,16 @@ $logoSrc = '../' . $rawLogoPath;
                 <!-- Main Puantaj Table -->
                 <table class="report-table">
                     <thead>
+                        <?php
+                        $nameColWidth = ($periodType === 'weekly') ? '20%' : '16%';
+                        $dateColWidth = ($periodType === 'weekly') ? '8%' : '2%';
+                        $totalDaysWidth = ($periodType === 'weekly') ? '12%' : '11%';
+                        $totalPaymentWidth = ($periodType === 'weekly') ? '12%' : '11%';
+                        ?>
                         <tr>
-                            <th style="text-align: left; padding-left: 10px; width: 180px;">Çalışan Adı Soyadı</th>
+                            <th style="text-align: left; padding-left: 10px; width: <?php echo $nameColWidth; ?>;">Çalışan Adı Soyadı</th>
                             <?php foreach ($datesArray as $dt): ?>
-                                <th>
+                                <th style="width: <?php echo $dateColWidth; ?>;">
                                     <?php if ($periodType === 'weekly'): ?>
                                         <div style="font-weight: 800; font-size: 0.75rem;"><?php echo getTurkishDayNameShort($dt); ?></div>
                                         <div style="font-size: 0.65rem; font-weight: 500; opacity: 0.8;"><?php echo date('d', strtotime($dt)); ?></div>
@@ -671,37 +677,64 @@ $logoSrc = '../' . $rawLogoPath;
                                     <?php endif; ?>
                                 </th>
                             <?php endforeach; ?>
-                            <th style="width: 100px; font-size: 0.75rem;">Toplam Gün</th>
+                            <th style="width: <?php echo $totalDaysWidth; ?>; font-size: 0.75rem;">Toplam Gün</th>
+                            <th style="width: <?php echo $totalPaymentWidth; ?>; font-size: 0.75rem; text-align: right; padding-right: 8px;">Toplam Ödeme</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($employees)): ?>
                             <tr>
-                                <td colspan="<?php echo count($datesArray) + 2; ?>" style="padding: 30px; color: #64748b; font-size: 0.85rem;">Raporlanacak çalışan bulunmamaktadır.</td>
+                                <td colspan="<?php echo count($datesArray) + 3; ?>" style="padding: 30px; color: #64748b; font-size: 0.85rem;">Raporlanacak çalışan bulunmamaktadır.</td>
                             </tr>
                         <?php else: ?>
+                            <?php
+                            $grandTotalDays = 0.0;
+                            $grandTotalPayment = 0.0;
+                            ?>
                             <?php foreach ($employees as $emp): ?>
                                 <?php 
                                 $empId = $emp['id'];
                                 $totalWorkedDays = 0.0;
+                                $totalPayment = 0.0;
+                                $fullWage = (float)($emp['daily_wage_full'] ?? 0.0);
+                                $halfWage = (float)($emp['daily_wage_half'] ?? 0.0);
                                 ?>
                                 <tr>
-                                    <td class="emp-name"><?php echo e($emp['name']); ?></td>
+                                    <td class="emp-name" style="width: <?php echo $nameColWidth; ?>;"><?php echo e($emp['name']); ?></td>
                                     <?php foreach ($datesArray as $dt): ?>
                                         <?php 
                                         $slots = isset($scheduleData[$empId][$dt]) ? $scheduleData[$empId][$dt] : [];
                                         $shiftInfo = getDayShiftInfo($slots);
                                         $totalWorkedDays += $shiftInfo['weight'];
+                                        
+                                        if ($shiftInfo['text'] === 'T') {
+                                            $totalPayment += $fullWage;
+                                        } elseif ($shiftInfo['text'] === '2Y') {
+                                            $totalPayment += 2 * $halfWage;
+                                        } elseif ($shiftInfo['text'] === 'Y') {
+                                            $totalPayment += $halfWage;
+                                        }
                                         ?>
-                                        <td class="shift-cell">
+                                        <td class="shift-cell" style="width: <?php echo $dateColWidth; ?>;">
                                             <span class="shift-val <?php echo $shiftInfo['class']; ?>">
                                                 <?php echo $shiftInfo['text']; ?>
                                             </span>
                                         </td>
                                     <?php endforeach; ?>
-                                    <td class="total-col"><?php echo number_format($totalWorkedDays, 1, ',', '.'); ?> Gün</td>
+                                    <td class="total-col" style="width: <?php echo $totalDaysWidth; ?>;"><?php echo number_format($totalWorkedDays, 1, ',', '.'); ?> Gün</td>
+                                    <td class="total-col" style="width: <?php echo $totalPaymentWidth; ?>; color: #059669; text-align: right; padding-right: 8px;"><?php echo number_format($totalPayment, 2, ',', '.'); ?> ₺</td>
                                 </tr>
+                                <?php
+                                $grandTotalDays += $totalWorkedDays;
+                                $grandTotalPayment += $totalPayment;
+                                ?>
                             <?php endforeach; ?>
+                            <!-- Table Footer Row for Grand Totals -->
+                            <tr style="background-color: #f1f5f9; font-weight: 800;">
+                                <td style="text-align: right; padding-right: 10px; font-weight: 800; color: #0f172a;" colspan="<?php echo count($datesArray) + 1; ?>">Genel Toplam:</td>
+                                <td style="font-weight: 800; color: var(--primary); text-align: center;"><?php echo number_format($grandTotalDays, 1, ',', '.'); ?> Gün</td>
+                                <td style="font-weight: 800; color: #059669; text-align: right; padding-right: 8px;"><?php echo number_format($grandTotalPayment, 2, ',', '.'); ?> ₺</td>
+                            </tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -819,7 +852,14 @@ function downloadPDF() {
         margin:       0,
         filename:     'puantaj_raporu_<?php echo str_replace("-", "_", $periodType === "weekly" ? $selectedWeek : $selectedMonth); ?>.pdf',
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, logging: false },
+        html2canvas:  { 
+            scale: 2.5, 
+            useCORS: true, 
+            logging: false,
+            letterRendering: true,
+            scrollX: 0,
+            scrollY: 0
+        },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
     };
     

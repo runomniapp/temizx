@@ -41,7 +41,7 @@ class Employee {
      * Yeni personel ekle
      */
     public function create($data) {
-        $stmt = $this->db->prepare("INSERT INTO employees (name, phone, photo, status, work_hours_start, work_hours_end, off_days, employee_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $this->db->prepare("INSERT INTO employees (name, phone, photo, status, work_hours_start, work_hours_end, off_days, employee_type, daily_wage_full, daily_wage_half) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         return $stmt->execute([
             $data['name'],
             $data['phone'],
@@ -50,7 +50,9 @@ class Employee {
             $data['work_hours_start'] ?? '08:00:00',
             $data['work_hours_end'] ?? '17:00:00',
             $data['off_days'] ?? 'Sunday',
-            $data['employee_type'] ?? 'general'
+            $data['employee_type'] ?? 'general',
+            $data['daily_wage_full'] ?? 0.00,
+            $data['daily_wage_half'] ?? 0.00
         ]);
     }
     
@@ -58,7 +60,7 @@ class Employee {
      * Personel güncelle
      */
     public function update($id, $data) {
-        $stmt = $this->db->prepare("UPDATE employees SET name = ?, phone = ?, photo = ?, status = ?, work_hours_start = ?, work_hours_end = ?, off_days = ?, employee_type = ? WHERE id = ?");
+        $stmt = $this->db->prepare("UPDATE employees SET name = ?, phone = ?, photo = ?, status = ?, work_hours_start = ?, work_hours_end = ?, off_days = ?, employee_type = ?, daily_wage_full = ?, daily_wage_half = ? WHERE id = ?");
         return $stmt->execute([
             $data['name'],
             $data['phone'],
@@ -68,6 +70,8 @@ class Employee {
             $data['work_hours_end'],
             $data['off_days'],
             $data['employee_type'] ?? 'general',
+            $data['daily_wage_full'] ?? 0.00,
+            $data['daily_wage_half'] ?? 0.00,
             $id
         ]);
     }
