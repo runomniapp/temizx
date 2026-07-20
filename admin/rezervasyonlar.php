@@ -751,7 +751,7 @@ $allBookings = $bookingModel->getAll($filters);
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
                             <label class="form-label" style="font-size: 0.8rem; margin-bottom: 4px; font-weight: 700;">Saat Dilimi *</label>
-                            <select name="time_slot" id="edit_booking_time_slot" class="form-control" style="font-size: 0.9rem; padding: 8px 16px; height: auto;" required>
+                            <select name="booking_time_slot" id="edit_booking_time_slot" class="form-control" style="font-size: 0.9rem; padding: 8px 16px; height: auto;" required>
                                 <option value="08-17">Tam Gün (08-17)</option>
                                 <option value="08-12">Sabah (08-12)</option>
                                 <option value="13-17">Öğleden Sonra (13-17)</option>
