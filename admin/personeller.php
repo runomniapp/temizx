@@ -102,16 +102,18 @@ $employees = $employeeModel->getAll(false);
                     <?php foreach ($employees as $row): ?>
                         <tr>
                             <td>
-                                <?php 
-                                $photoPath = '../' . $row['photo'];
-                                if (strpos($row['photo'], 'default_') === 0 || !file_exists($photoPath)) {
-                                    // simple text-based fallback or default image
-                                    $photoPath = '../assets/img/default_employee.png'; // let's fallback to assets
-                                }
-                                ?>
-                                <div class="user-avatar" style="width: 50px; height: 50px; border-radius: 14px; font-size: 1.1rem; font-weight: 800;">
-                                    <?php echo strtoupper(substr($row['name'], 0, 2)); ?>
-                                </div>
+                                 <?php 
+                                 $photoPath = '../assets/img/profile.png';
+                                 if (!empty($row['photo']) && strpos($row['photo'], 'default_') === false) {
+                                     $checkPath = '../' . $row['photo'];
+                                     if (file_exists($checkPath)) {
+                                         $photoPath = $checkPath;
+                                     }
+                                 }
+                                 ?>
+                                 <div class="user-avatar" style="width: 50px; height: 50px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: #f1f5f9; padding: 0; border: 1px solid var(--border);">
+                                     <img src="<?php echo e($photoPath); ?>" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;">
+                                 </div>
                             </td>
                             <td>
                                 <strong><?php echo e($row['name']); ?></strong>

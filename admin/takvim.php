@@ -196,11 +196,20 @@ foreach ($weekJobs as $job) {
                     <?php foreach ($allEmployees as $emp): ?>
                         <tr>
                             <td>
-                                <div class="employee-cell">
-                                    <div class="user-avatar" style="width: 32px; height: 32px; font-size: 0.8rem;">
-                                        <?php echo strtoupper(substr($emp['name'], 0, 2)); ?>
-                                    </div>
-                                    <span><?php echo e($emp['name']); ?></span>
+                                 <div class="employee-cell">
+                                     <?php 
+                                     $photoPath = '../assets/img/profile.png';
+                                     if (!empty($emp['photo']) && strpos($emp['photo'], 'default_') === false) {
+                                         $checkPath = '../' . $emp['photo'];
+                                         if (file_exists($checkPath)) {
+                                             $photoPath = $checkPath;
+                                         }
+                                     }
+                                     ?>
+                                     <div class="user-avatar" style="width: 32px; height: 32px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: #f1f5f9; padding: 0; border: 1px solid var(--border);">
+                                         <img src="<?php echo e($photoPath); ?>" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;">
+                                     </div>
+                                     <span><?php echo e($emp['name']); ?></span>
                                 </div>
                             </td>
                             <?php foreach ($weekDates as $wd): ?>
