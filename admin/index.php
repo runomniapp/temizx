@@ -184,10 +184,11 @@ foreach ($months as $key => $m) {
 
 // 4. Onay Bekleyen Son 5 Rezervasyon
 $stmtPendingList = $pdo->prepare("
-    SELECT b.*, c.name as category_name, sub.name as subcategory_name
+    SELECT b.*, c.name as category_name, sub.name as subcategory_name, p.name as package_name
     FROM bookings b
     LEFT JOIN categories c ON b.category_id = c.id
     LEFT JOIN subcategories sub ON b.subcategory_id = sub.id
+    LEFT JOIN packages p ON b.package_id = p.id
     WHERE b.status = 'pending'
     ORDER BY b.id DESC
     LIMIT 5
