@@ -87,6 +87,12 @@ $adminUsername = $_SESSION['admin_username'] ?? 'Admin';
                 </a>
             </li>
             <li>
+                <a href="/admin/raporlar.php" class="menu-link <?php echo isMenuActive('raporlar.php'); ?>">
+                    <i class="fa-solid fa-chart-column"></i>
+                    <span>Raporlar</span>
+                </a>
+            </li>
+            <li>
                 <a href="/admin/slider.php" class="menu-link <?php echo isMenuActive('slider.php'); ?>">
                     <i class="fa-solid fa-images"></i>
                     <span>Slider Yönetimi</span>
