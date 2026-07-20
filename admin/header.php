@@ -12,6 +12,19 @@ $auth->requireLogin(); // Giriş yapılmamışsa login.php'ye atar
 $compName = getSetting('company_name', 'OLiFA Temizlik');
 $logoPath = '../' . getSetting('logo_path', 'assets/img/olifa_logo.png');
 $adminUsername = $_SESSION['admin_username'] ?? 'Admin';
+
+// Son 5 onay bekleyen teklif/rezervasyonu çek
+$stmtPending = $pdo->prepare("
+    SELECT b.*, c.name as category_name 
+    FROM bookings b
+    LEFT JOIN categories c ON b.category_id = c.id
+    WHERE b.status = 'pending' 
+    ORDER BY b.id DESC 
+    LIMIT 5
+");
+$stmtPending->execute();
+$pendingOffers = $stmtPending->fetchAll();
+$pendingCount = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status = 'pending'")->fetchColumn() ?: 0;
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -135,19 +148,51 @@ $adminUsername = $_SESSION['admin_username'] ?? 'Admin';
                     <i class="fa-solid fa-bars"></i>
                 </button>
                 <div class="admin-title" style="margin-right: 15px;">OLiFA<span class="hide-mobile"> Panel</span></div>
-                
-                <!-- Mockup Arama Kutusu -->
-                <div class="hide-mobile" style="display: flex; align-items: center; flex-grow: 1; max-width: 320px; position: relative;">
-                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 16px; color: var(--text-muted); font-size: 0.85rem;"></i>
-                    <input type="text" placeholder="Her şeyi arayın..." style="width: 100%; padding: 8px 16px 8px 40px; border-radius: 20px; border: 1px solid var(--border); background-color: var(--background); font-size: 0.82rem; font-weight: 500; transition: var(--transition);">
-                </div>
             </div>
             
             <div class="user-profile" style="gap: 20px;">
                 <!-- Bildirim İkonu -->
-                <div style="position: relative; cursor: pointer; color: var(--text-muted); font-size: 1.1rem; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; background-color: var(--background); border-radius: 50%; border: 1px solid var(--border);">
-                    <i class="fa-regular fa-bell"></i>
-                    <span style="position: absolute; top: 0; right: 0; width: 8px; height: 8px; background-color: var(--primary); border-radius: 50%; border: 2px solid #ffffff;"></span>
+                <div style="position: relative;" id="notificationDropdownContainer">
+                    <div onclick="toggleNotificationDropdown(event)" style="position: relative; cursor: pointer; color: var(--text-muted); font-size: 1.1rem; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; background-color: var(--background); border-radius: 50%; border: 1px solid var(--border);">
+                        <i class="fa-regular fa-bell"></i>
+                        <?php if ($pendingCount > 0): ?>
+                            <span style="position: absolute; top: 0; right: 0; width: 8px; height: 8px; background-color: var(--primary); border-radius: 50%; border: 2px solid #ffffff;"></span>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <!-- Glassmorphism Dropdown Menu -->
+                    <div id="notificationDropdown" style="display: none; position: absolute; top: 48px; right: 0; width: 320px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); z-index: 1000; padding: 15px; box-sizing: border-box;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 10px;">
+                            <strong style="font-size: 0.88rem; color: var(--text-main);">Rezervasyon Teklifleri</strong>
+                            <span class="badge badge-pending" style="font-size: 0.7rem; padding: 2px 8px; border-radius: 8px;"><?php echo $pendingCount; ?> Yeni</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto;">
+                            <?php if (count($pendingOffers) === 0): ?>
+                                <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px 0;">
+                                    <i class="fa-regular fa-circle-check" style="font-size: 1.5rem; margin-bottom: 8px; color: var(--success); display: block;"></i>
+                                    Yeni teklif bulunmuyor.
+                                </div>
+                            <?php else: ?>
+                                <?php foreach ($pendingOffers as $offer): ?>
+                                    <a href="/admin/rezervasyonlar.php?search=<?php echo urlencode($offer['customer_name']); ?>" style="display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.25); text-decoration: none; transition: var(--transition);" onmouseover="this.style.background='rgba(255, 255, 255, 0.8)'" onmouseout="this.style.background='rgba(255, 255, 255, 0.5)'">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <strong style="font-size: 0.82rem; color: var(--text-main);"><?php echo e($offer['customer_name']); ?></strong>
+                                            <span style="font-size: 0.72rem; color: var(--primary); font-weight: 700;"><?php echo formatPrice($offer['total_price']); ?></span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: var(--text-muted);">
+                                            <span><?php echo e($offer['category_name']); ?></span>
+                                            <span><?php echo date('d.m.Y', strtotime($offer['booking_date'])); ?></span>
+                                        </div>
+                                    </a>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                        <div style="border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; text-align: center;">
+                            <a href="/admin/rezervasyonlar.php" style="font-size: 0.8rem; font-weight: 700; color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                                Tümünü Gör <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i>
+                            </a>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="user-info hide-mobile" style="text-align: right;">
@@ -159,5 +204,24 @@ $adminUsername = $_SESSION['admin_username'] ?? 'Admin';
                 </div>
             </div>
         </header>
+        
+        <script>
+            function toggleNotificationDropdown(event) {
+                event.stopPropagation();
+                const dropdown = document.getElementById('notificationDropdown');
+                if (dropdown.style.display === 'none' || !dropdown.style.display) {
+                    dropdown.style.display = 'block';
+                } else {
+                    dropdown.style.display = 'none';
+                }
+            }
+            document.addEventListener('click', function(event) {
+                const dropdown = document.getElementById('notificationDropdown');
+                const container = document.getElementById('notificationDropdownContainer');
+                if (dropdown && container && !container.contains(event.target)) {
+                    dropdown.style.display = 'none';
+                }
+            });
+        </script>
         
         <main class="admin-content">
