@@ -324,7 +324,7 @@ const packagesDataList = <?php echo json_encode($packages); ?>;
 
 function openPackageDetail(id, event) {
     if (event) event.stopPropagation();
-    const pkg = packagesDataList.find(p => p.id === id);
+    const pkg = packagesDataList.find(p => parseInt(p.id) === parseInt(id));
     if (!pkg) return;
     
     document.getElementById("modalPackageName").innerText = pkg.name;

@@ -75,7 +75,7 @@ class Auth {
      */
     public function requireLogin() {
         if (!$this->check()) {
-            header("Location: /admin/login.php");
+            header("Location: login.php");
             exit;
         }
     }
