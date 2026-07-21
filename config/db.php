@@ -3,11 +3,21 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-define('DB_HOST', '127.0.0.1');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'olifa_db');
-define('DB_PORT', '3306');
+$isLocalhost = in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1']) || ($_SERVER['HTTP_HOST'] ?? '') === 'localhost' || strpos($_SERVER['HTTP_HOST'] ?? '', 'localhost:') === 0;
+
+if ($isLocalhost) {
+    define('DB_HOST', '127.0.0.1');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
+    define('DB_NAME', 'olifa_db');
+    define('DB_PORT', '3306');
+} else {
+    define('DB_HOST', 'localhost');
+    define('DB_USER', 'run379app_volkanbagci');
+    define('DB_PASS', '3S2tevs0.+');
+    define('DB_NAME', 'run379app_temizx');
+    define('DB_PORT', '3306');
+}
 
 try {
     // Connect directly with dbname for maximum query performance (bypassing extra queries)
