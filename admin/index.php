@@ -561,7 +561,7 @@ foreach ($allCategories as $cat) {
                             <tr>
                                 <td>
                                     <strong><?php echo e($row['customer_name']); ?></strong>
-                                    <span style="display: block; font-size: 0.8rem; color: var(--text-muted);"><?php echo e($row['customer_phone']); ?></span>
+                                    <span style="display: block; font-size: 0.8rem; color: var(--text-muted);"><i class="fa-solid fa-phone" style="font-size: 0.75rem;"></i> <?php echo e(formatPhoneDisplay($row['customer_phone'])); ?></span>
                                 </td>
                                 <td>
                                     <strong style="display: block;"><?php echo e($row['category_name']); ?></strong>

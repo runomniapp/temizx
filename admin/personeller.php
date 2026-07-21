@@ -119,7 +119,7 @@ $employees = $employeeModel->getAll(false);
                                 <strong><?php echo e($row['name']); ?></strong>
                                <br><span style="font-size: 0.72rem; color: #64748b; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; margin-top: 3px;"><?php echo $row['employee_type'] === 'furniture' ? '<i class="fa-solid fa-couch" style="color: #8b5cf6;"></i> Koltuk & Yatak Yıkama' : '<i class="fa-solid fa-house-chimney" style="color: #3b82f6;"></i> Genel Temizlik'; ?></span>
                             </td>
-                            <td><code><?php echo e($row['phone']); ?></code></td>
+                            <td><code><?php echo e(formatPhoneDisplay($row['phone'])); ?></code></td>
                             <td><?php echo date('H:i', strtotime($row['work_hours_start'])); ?> - <?php echo date('H:i', strtotime($row['work_hours_end'])); ?></td>
                             <td>
                                 <div>Tam: <strong><?php echo number_format($row['daily_wage_full'] ?? 0, 0, ',', '.'); ?> ₺</strong></div>
@@ -174,7 +174,13 @@ $employees = $employeeModel->getAll(false);
                 
                 <div class="form-group">
                     <label class="form-label" for="emp_phone">Telefon Numarası *</label>
-                    <input type="text" name="phone" id="emp_phone" class="form-control" placeholder="555-555-55-55" maxlength="13" required>
+                    <div style="display: flex; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden;">
+                        <div style="display: flex; align-items: center; gap: 6px; background: #f8fafc; padding: 10px 14px; border-right: 1px solid var(--border); font-weight: 700; color: #334155; font-size: 0.95rem; user-select: none;">
+                            <span style="font-size: 1.2rem;">🇹🇷</span>
+                            <span>+90</span>
+                        </div>
+                        <input type="text" name="phone" id="emp_phone" class="form-control" placeholder="555 555 55 55" maxlength="14" style="border: none; border-radius: 0; flex: 1; padding: 10px 16px; font-size: 0.95rem;" required>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -274,7 +280,18 @@ function openEmployeeModal(emp = null) {
         document.getElementById("empModalTitle").innerText = "Personeli Düzenle";
         document.getElementById("emp_id").value = emp.id;
         document.getElementById("emp_name").value = emp.name;
-        document.getElementById("emp_phone").value = emp.phone;
+        
+        let cleanP = (emp.phone || "").replace(/\D/g, "");
+        if (cleanP.startsWith("90")) cleanP = cleanP.substring(2);
+        if (cleanP.startsWith("0")) cleanP = cleanP.substring(1);
+        if (cleanP.length > 10) cleanP = cleanP.substring(0, 10);
+        let formP = "";
+        if (cleanP.length > 0) formP += cleanP.substring(0, 3);
+        if (cleanP.length > 3) formP += " " + cleanP.substring(3, 6);
+        if (cleanP.length > 6) formP += " " + cleanP.substring(6, 8);
+        if (cleanP.length > 8) formP += " " + cleanP.substring(8, 10);
+        document.getElementById("emp_phone").value = formP;
+        
         document.getElementById("emp_status").value = emp.status;
         document.getElementById("emp_start").value = emp.work_hours_start.substring(0, 5);
         document.getElementById("emp_end").value = emp.work_hours_end.substring(0, 5);
@@ -315,9 +332,10 @@ window.addEventListener("DOMContentLoaded", () => {
     const empPhone = document.getElementById("emp_phone");
     if (empPhone) {
         empPhone.placeholder = "555 555 55 55";
-        empPhone.maxLength = 12;
+        empPhone.maxLength = 14;
         empPhone.addEventListener("input", () => {
             let value = empPhone.value.replace(/\D/g, "");
+            if (value.startsWith("90")) value = value.substring(2);
             if (value.startsWith("0")) value = value.substring(1);
             if (value.length > 10) value = value.substring(0, 10);
             let formatted = "";
@@ -326,11 +344,6 @@ window.addEventListener("DOMContentLoaded", () => {
             if (value.length > 6) formatted += " " + value.substring(6, 8);
             if (value.length > 8) formatted += " " + value.substring(8, 10);
             empPhone.value = formatted;
-        });
-        empPhone.addEventListener("keydown", (e) => {
-            const allowedKeys = ["Backspace", "Delete", "Tab", "ArrowLeft", "ArrowRight", "Enter", "Control", "a", "c", "v", "x"];
-            if (allowedKeys.includes(e.key) || (e.ctrlKey && ["a", "c", "v", "x"].includes(e.key.toLowerCase()))) return;
-            if (!/\d/.test(e.key)) e.preventDefault();
         });
     }
 });

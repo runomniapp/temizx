@@ -100,6 +100,12 @@ $pendingCount = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status = 'pendi
                 </a>
             </li>
             <li>
+                <a href="/admin/whatsapp.php" class="menu-link <?php echo isMenuActive('whatsapp.php'); ?>">
+                    <i class="fa-brands fa-whatsapp" style="color: #22c55e;"></i>
+                    <span>WhatsApp Entegrasyonu</span>
+                </a>
+            </li>
+            <li>
                 <a href="/admin/raporlar.php" class="menu-link <?php echo isMenuActive('raporlar.php'); ?>">
                     <i class="fa-solid fa-chart-column"></i>
                     <span>Raporlar</span>

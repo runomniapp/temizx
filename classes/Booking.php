@@ -2,6 +2,7 @@
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/Employee.php';
 require_once __DIR__ . '/Category.php';
+require_once __DIR__ . '/WhatsAppService.php';
 
 class Booking {
     private $db;
@@ -285,6 +286,12 @@ class Booking {
             }
             
             $this->db->commit();
+
+            // WhatsApp bildirimi tetikle (durum onaylandıysa)
+            if ($status === 'confirmed') {
+                WhatsAppService::sendBookingNotifications($bookingId);
+            }
+
             return true;
         } catch (Exception $e) {
             $this->db->rollBack();
@@ -547,6 +554,11 @@ class Booking {
             }
             
             $this->db->commit();
+
+            if ($newStatus === 'confirmed') {
+                WhatsAppService::sendBookingNotifications($bookingId);
+            }
+
             return true;
         } catch (Exception $e) {
             $this->db->rollBack();
@@ -713,6 +725,11 @@ class Booking {
             }
             
             $this->db->commit();
+
+            if ($data['status'] === 'confirmed') {
+                WhatsAppService::sendBookingNotifications($id);
+            }
+
             return true;
         } catch (Exception $e) {
             $this->db->rollBack();

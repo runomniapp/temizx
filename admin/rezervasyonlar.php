@@ -3,6 +3,7 @@ require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/../classes/Booking.php';
 require_once __DIR__ . '/../classes/Category.php';
 require_once __DIR__ . '/../classes/Package.php';
+require_once __DIR__ . '/../classes/WhatsAppService.php';
 
 $bookingModel = new Booking();
 $categoryModel = new Category();
@@ -165,6 +166,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         }
                     }
                 }
+            }
+            if ($data['status'] === 'confirmed') {
+                WhatsAppService::sendBookingNotifications($newBookingId);
             }
             $msg = '<div style="background-color: #ecfdf5; color: var(--success); padding: 15px 20px; border-radius: 12px; font-weight: 600; font-size: 0.95rem; margin-bottom: 25px;"><i class="fa-solid fa-circle-check"></i> Manuel rezervasyon/abonelik başarıyla oluşturuldu!</div>';
         } else {
@@ -416,8 +420,8 @@ $allBookings = $bookingModel->getAll($filters);
                 <!-- Sort Dropdown Content -->
                 <div class="sort-dropdown-content" id="sortDropdown">
                     <div class="dropdown-header-title">Sıralama Seçenekleri</div>
-                    <label class="sort-option"><input type="radio" name="sortOption" value="date-desc" checked onchange="applyFilters()"> <span>Tarihe Göre (En Yeni)</span></label>
-                    <label class="sort-option"><input type="radio" name="sortOption" value="date-asc" onchange="applyFilters()"> <span>Tarihe Göre (En Eski)</span></label>
+                    <label class="sort-option"><input type="radio" name="sortOption" value="date-desc" checked onchange="applyFilters()"> <span>En Son Eklenen (En Yeni)</span></label>
+                    <label class="sort-option"><input type="radio" name="sortOption" value="date-asc" onchange="applyFilters()"> <span>Hizmet Tarihine Göre</span></label>
                     <label class="sort-option"><input type="radio" name="sortOption" value="name-asc" onchange="applyFilters()"> <span>İsim (A - Z)</span></label>
                     <label class="sort-option"><input type="radio" name="sortOption" value="name-desc" onchange="applyFilters()"> <span>İsim (Z - A)</span></label>
                 </div>
@@ -446,7 +450,7 @@ $allBookings = $bookingModel->getAll($filters);
                         </tr>
                     <?php else: ?>
                         <?php foreach ($allBookings as $row): ?>
-                            <tr class="booking-row" data-name="<?php echo e(mb_strtolower($row['customer_name'], 'UTF-8')); ?>" data-phone="<?php echo e(preg_replace('/[^0-9]/', '', $row['customer_phone'])); ?>" data-status="<?php echo e($row['status']); ?>" data-date="<?php echo strtotime($row['booking_date']); ?>">
+                            <tr class="booking-row" data-id="<?php echo (int)$row['id']; ?>" data-name="<?php echo e(mb_strtolower($row['customer_name'], 'UTF-8')); ?>" data-phone="<?php echo e(preg_replace('/[^0-9]/', '', $row['customer_phone'])); ?>" data-status="<?php echo e($row['status']); ?>" data-date="<?php echo strtotime($row['booking_date']); ?>">
                                 <td>
                                     <div style="display: flex; align-items: center; gap: 6px; min-width: 0; flex-grow: 1;">
                                         <!-- Kategori Rozeti (Mobilde satır başında) -->
@@ -476,7 +480,7 @@ $allBookings = $bookingModel->getAll($filters);
                                         <div style="min-width: 0; flex-grow: 1;">
                                             <strong class="customer-name-text" style="font-size: 0.88rem; color: var(--text-main); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><?php echo e($row['customer_name']); ?></strong>
                                             <!-- Desktop-only secondary info -->
-                                            <span style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" class="hide-mobile"><i class="fa-solid fa-phone"></i> <?php echo e($row['customer_phone']); ?></span>
+                                            <span style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" class="hide-mobile"><i class="fa-solid fa-phone"></i> <?php echo e(formatPhoneDisplay($row['customer_phone'])); ?></span>
                                             <?php if ($row['customer_email']): ?>
                                                 <span style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" class="hide-mobile"><i class="fa-solid fa-envelope"></i> <?php echo e($row['customer_email']); ?></span>
                                             <?php endif; ?>
@@ -518,7 +522,7 @@ $allBookings = $bookingModel->getAll($filters);
                                 <td style="text-align: right;">
                                     <div style="display: flex; justify-content: flex-end; gap: 3px; align-items: center; flex-wrap: nowrap;">
                                         <!-- Ara Butonu -->
-                                        <a href="tel:<?php echo str_replace([' ', '-', '(', ')'], '', $row['customer_phone']); ?>" class="btn btn-outline action-btn" data-action="call" style="color: var(--success); border-color: var(--success); padding: 6px 10px; font-size: 0.85rem;" title="Müşteriyi Ara">
+                                        <a href="tel:<?php echo formatPhoneTelUrl($row['customer_phone']); ?>" class="btn btn-outline action-btn" data-action="call" style="color: var(--success); border-color: var(--success); padding: 6px 10px; font-size: 0.85rem;" title="Müşteriyi Ara (<?php echo e(formatPhoneDisplay($row['customer_phone'])); ?>)">
                                             <i class="fa-solid fa-phone-flip"></i>
                                         </a>
                                         <!-- Detay Butonu -->
@@ -620,7 +624,13 @@ $allBookings = $bookingModel->getAll($filters);
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
                             <label class="form-label" style="font-size: 0.8rem; margin-bottom: 4px; font-weight: 700;">Telefon *</label>
-                            <input type="text" name="customer_phone" id="new_booking_cust_phone" class="form-control" placeholder="555 555 55 55" maxlength="13" style="font-size: 0.9rem; padding: 8px 16px;" required>
+                            <div style="display: flex; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden;">
+                                <div style="display: flex; align-items: center; gap: 6px; background: #f8fafc; padding: 6px 10px; border-right: 1px solid var(--border); font-weight: 700; color: #334155; font-size: 0.85rem; user-select: none;">
+                                    <span style="font-size: 1.1rem;">🇹🇷</span>
+                                    <span>+90</span>
+                                </div>
+                                <input type="text" name="customer_phone" id="new_booking_cust_phone" class="form-control" placeholder="555 555 55 55" maxlength="14" style="border: none; border-radius: 0; flex: 1; font-size: 0.9rem; padding: 8px 14px;" required>
+                            </div>
                         </div>
                     </div>
                     
@@ -724,7 +734,13 @@ $allBookings = $bookingModel->getAll($filters);
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
                             <label class="form-label" style="font-size: 0.8rem; margin-bottom: 4px; font-weight: 700;">Telefon *</label>
-                            <input type="text" name="customer_phone" id="edit_booking_cust_phone" class="form-control" placeholder="555 555 55 55" maxlength="13" style="font-size: 0.9rem; padding: 8px 16px;" required>
+                            <div style="display: flex; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden;">
+                                <div style="display: flex; align-items: center; gap: 6px; background: #f8fafc; padding: 6px 10px; border-right: 1px solid var(--border); font-weight: 700; color: #334155; font-size: 0.85rem; user-select: none;">
+                                    <span style="font-size: 1.1rem;">🇹🇷</span>
+                                    <span>+90</span>
+                                </div>
+                                <input type="text" name="customer_phone" id="edit_booking_cust_phone" class="form-control" placeholder="555 555 55 55" maxlength="14" style="border: none; border-radius: 0; flex: 1; font-size: 0.9rem; padding: 8px 14px;" required>
+                            </div>
                         </div>
                     </div>
                     
@@ -869,7 +885,18 @@ function openEditBooking(row) {
     document.getElementById("edit_booking_id").value = row.id;
     document.getElementById("edit_booking_package_id").value = row.package_id || '';
     document.getElementById("edit_booking_cust_name").value = row.customer_name;
-    document.getElementById("edit_booking_cust_phone").value = row.customer_phone;
+    
+    let cleanPhone = (row.customer_phone || "").replace(/\D/g, "");
+    if (cleanPhone.startsWith("90")) cleanPhone = cleanPhone.substring(2);
+    if (cleanPhone.startsWith("0")) cleanPhone = cleanPhone.substring(1);
+    if (cleanPhone.length > 10) cleanPhone = cleanPhone.substring(0, 10);
+    let formattedPhone = "";
+    if (cleanPhone.length > 0) formattedPhone += cleanPhone.substring(0, 3);
+    if (cleanPhone.length > 3) formattedPhone += " " + cleanPhone.substring(3, 6);
+    if (cleanPhone.length > 6) formattedPhone += " " + cleanPhone.substring(6, 8);
+    if (cleanPhone.length > 8) formattedPhone += " " + cleanPhone.substring(8, 10);
+    document.getElementById("edit_booking_cust_phone").value = formattedPhone;
+    
     document.getElementById("edit_booking_cust_email").value = row.customer_email || '';
     document.getElementById("edit_booking_cust_address").value = row.customer_address;
     document.getElementById("edit_booking_date").value = row.booking_date;
@@ -1461,9 +1488,10 @@ window.addEventListener("DOMContentLoaded", () => {
     const maskPhoneInput = (input) => {
         if (!input) return;
         input.placeholder = "555 555 55 55";
-        input.maxLength = 13;
+        input.maxLength = 14;
         input.addEventListener("input", () => {
             let value = input.value.replace(/\D/g, "");
+            if (value.startsWith("90")) value = value.substring(2);
             if (value.startsWith("0")) value = value.substring(1);
             if (value.length > 10) value = value.substring(0, 10);
             let formatted = "";
@@ -1472,11 +1500,6 @@ window.addEventListener("DOMContentLoaded", () => {
             if (value.length > 6) formatted += " " + value.substring(6, 8);
             if (value.length > 8) formatted += " " + value.substring(8, 10);
             input.value = formatted;
-        });
-        input.addEventListener("keydown", (e) => {
-            const allowedKeys = ["Backspace", "Delete", "Tab", "ArrowLeft", "ArrowRight", "Enter", "Control", "a", "c", "v", "x"];
-            if (allowedKeys.includes(e.key) || (e.ctrlKey && ["a", "c", "v", "x"].includes(e.key.toLowerCase()))) return;
-            if (!/\d/.test(e.key)) e.preventDefault();
         });
     };
     
@@ -1612,16 +1635,21 @@ window.applyFilters = function() {
     const tbody = document.querySelector('table.admin-table tbody');
     if (tbody && rows.length > 0) {
         rows.sort((a, b) => {
-            if (activeSort === 'date-asc') {
-                return parseInt(a.getAttribute('data-date')) - parseInt(b.getAttribute('data-date'));
-            } else if (activeSort === 'date-desc') {
-                return parseInt(b.getAttribute('data-date')) - parseInt(a.getAttribute('data-date'));
+            const idA = parseInt(a.getAttribute('data-id')) || 0;
+            const idB = parseInt(b.getAttribute('data-id')) || 0;
+            const dateA = parseInt(a.getAttribute('data-date')) || 0;
+            const dateB = parseInt(b.getAttribute('data-date')) || 0;
+
+            if (activeSort === 'date-desc') {
+                return idB - idA; // En son eklenen/oluşturulan randevu en üstte
+            } else if (activeSort === 'date-asc') {
+                return dateA - dateB || idB - idA;
             } else if (activeSort === 'name-asc') {
-                return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'), 'tr');
+                return (a.getAttribute('data-name') || '').localeCompare(b.getAttribute('data-name') || '', 'tr');
             } else if (activeSort === 'name-desc') {
-                return b.getAttribute('data-name').localeCompare(a.getAttribute('data-name'), 'tr');
+                return (b.getAttribute('data-name') || '').localeCompare(a.getAttribute('data-name') || '', 'tr');
             }
-            return 0;
+            return idB - idA;
         });
         
         rows.forEach(row => tbody.appendChild(row));

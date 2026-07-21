@@ -34,6 +34,39 @@ function formatPrice($price) {
 }
 
 /**
+ * Telefon numarasını Türkiye formatında göster (+90 5XX XXX XX XX)
+ */
+function formatPhoneDisplay($phone) {
+    if (empty($phone)) return '';
+    $clean = preg_replace('/\D/', '', $phone);
+    if (strpos($clean, '90') === 0 && strlen($clean) > 10) {
+        $clean = substr($clean, 2);
+    }
+    if (strpos($clean, '0') === 0 && strlen($clean) > 9) {
+        $clean = substr($clean, 1);
+    }
+    if (strlen($clean) === 10) {
+        return '+90 ' . substr($clean, 0, 3) . ' ' . substr($clean, 3, 3) . ' ' . substr($clean, 6, 2) . ' ' . substr($clean, 8, 2);
+    }
+    return '+90 ' . $phone;
+}
+
+/**
+ * Telefon numarasını arama (tel:) URL'si için formatla (+905XXXXXXXXX)
+ */
+function formatPhoneTelUrl($phone) {
+    if (empty($phone)) return '';
+    $clean = preg_replace('/\D/', '', $phone);
+    if (strpos($clean, '90') === 0 && strlen($clean) > 10) {
+        $clean = substr($clean, 2);
+    }
+    if (strpos($clean, '0') === 0 && strlen($clean) > 9) {
+        $clean = substr($clean, 1);
+    }
+    return '+90' . $clean;
+}
+
+/**
  * İngilizce gün isimlerini Türkçeye çevir
  */
 function translateDay($dayName) {

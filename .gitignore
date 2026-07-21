@@ -21,3 +21,9 @@ yarn-error.log*
 # User Uploads
 uploads/*
 !uploads/.gitkeep
+
+# Node & WhatsApp Service
+node_modules/
+whatsapp-service/node_modules/
+whatsapp-service/.wwebjs_auth/
+scratch/
