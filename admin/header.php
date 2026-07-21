@@ -57,80 +57,80 @@ $pendingCount = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status = 'pendi
     <!-- Sidebar Menu -->
     <aside class="admin-sidebar" id="adminSidebar">
         <div class="sidebar-logo">
-            <a href="/admin/index.php">
+            <a href="index.php">
                 <img src="<?php echo e($logoPath); ?>" alt="<?php echo e($compName); ?>">
             </a>
         </div>
         
         <ul class="sidebar-menu">
             <li>
-                <a href="/admin/index.php" class="menu-link <?php echo isMenuActive('index.php'); ?>">
+                <a href="index.php" class="menu-link <?php echo isMenuActive('index.php'); ?>">
                     <i class="fa-solid fa-chart-pie"></i>
                     <span>Dashboard</span>
                 </a>
             </li>
             <li>
-                <a href="/admin/takvim.php" class="menu-link <?php echo isMenuActive('takvim.php'); ?>">
+                <a href="takvim.php" class="menu-link <?php echo isMenuActive('takvim.php'); ?>">
                     <i class="fa-solid fa-calendar-days"></i>
                     <span>Akıllı Takvim</span>
                 </a>
             </li>
             <li>
-                <a href="/admin/rezervasyonlar.php" class="menu-link <?php echo isMenuActive('rezervasyonlar.php'); ?>">
+                <a href="rezervasyonlar.php" class="menu-link <?php echo isMenuActive('rezervasyonlar.php'); ?>">
                     <i class="fa-solid fa-clipboard-list"></i>
                     <span>Teklif & Rezervasyonlar</span>
                 </a>
             </li>
             <li>
-                <a href="/admin/kategoriler.php" class="menu-link <?php echo isMenuActive('kategoriler.php'); ?>">
+                <a href="kategoriler.php" class="menu-link <?php echo isMenuActive('kategoriler.php'); ?>">
                     <i class="fa-solid fa-list-check"></i>
                     <span>Hizmet Kategorileri</span>
                 </a>
             </li>
             <li>
-                <a href="/admin/paketler.php" class="menu-link <?php echo isMenuActive('paketler.php'); ?>">
+                <a href="paketler.php" class="menu-link <?php echo isMenuActive('paketler.php'); ?>">
                     <i class="fa-solid fa-box-archive"></i>
                     <span>Abonelik Paketleri</span>
                 </a>
             </li>
             <li>
-                <a href="/admin/personeller.php" class="menu-link <?php echo isMenuActive('personeller.php'); ?>">
+                <a href="personeller.php" class="menu-link <?php echo isMenuActive('personeller.php'); ?>">
                     <i class="fa-solid fa-user-gear"></i>
                     <span>Personel Yönetimi</span>
                 </a>
             </li>
             <li>
-                <a href="/admin/whatsapp.php" class="menu-link <?php echo isMenuActive('whatsapp.php'); ?>">
+                <a href="whatsapp.php" class="menu-link <?php echo isMenuActive('whatsapp.php'); ?>">
                     <i class="fa-brands fa-whatsapp" style="color: #22c55e;"></i>
                     <span>WhatsApp Entegrasyonu</span>
                 </a>
             </li>
             <li>
-                <a href="/admin/raporlar.php" class="menu-link <?php echo isMenuActive('raporlar.php'); ?>">
+                <a href="raporlar.php" class="menu-link <?php echo isMenuActive('raporlar.php'); ?>">
                     <i class="fa-solid fa-chart-column"></i>
                     <span>Raporlar</span>
                 </a>
             </li>
             <li>
-                <a href="/admin/slider.php" class="menu-link <?php echo isMenuActive('slider.php'); ?>">
+                <a href="slider.php" class="menu-link <?php echo isMenuActive('slider.php'); ?>">
                     <i class="fa-solid fa-images"></i>
                     <span>Slider Yönetimi</span>
                 </a>
             </li>
             <li>
-                <a href="/admin/yorumlar.php" class="menu-link <?php echo isMenuActive('yorumlar.php'); ?>">
+                <a href="yorumlar.php" class="menu-link <?php echo isMenuActive('yorumlar.php'); ?>">
                     <i class="fa-solid fa-comments"></i>
                     <span>Müşteri Yorumları</span>
                 </a>
             </li>
             <li>
-                <a href="/admin/sss.php" class="menu-link <?php echo isMenuActive('sss.php'); ?>">
+                <a href="sss.php" class="menu-link <?php echo isMenuActive('sss.php'); ?>">
                     <i class="fa-solid fa-circle-question"></i>
                     <span>Sıkça Sorulan Sorular</span>
                 </a>
             </li>
             <li>
-                <a href="/admin/ayarlar.php" class="menu-link <?php echo isMenuActive('ayarlar.php'); ?>">
+                <a href="ayarlar.php" class="menu-link <?php echo isMenuActive('ayarlar.php'); ?>">
                     <i class="fa-solid fa-gears"></i>
                     <span>Sistem Ayarları</span>
                 </a>
@@ -138,7 +138,7 @@ $pendingCount = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status = 'pendi
         </ul>
         
         <div class="sidebar-footer">
-            <a href="/admin/logout.php" class="menu-link" style="color: var(--danger); background-color: #fef2f2;">
+            <a href="logout.php" class="menu-link" style="color: var(--danger); background-color: #fef2f2;">
                 <i class="fa-solid fa-right-from-bracket"></i>
                 <span>Güvenli Çıkış</span>
             </a>
@@ -180,7 +180,7 @@ $pendingCount = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status = 'pendi
                                 </div>
                             <?php else: ?>
                                 <?php foreach ($pendingOffers as $offer): ?>
-                                    <a href="/admin/rezervasyonlar.php?search=<?php echo urlencode($offer['customer_name']); ?>" style="display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.25); text-decoration: none; transition: var(--transition);" onmouseover="this.style.background='rgba(255, 255, 255, 0.8)'" onmouseout="this.style.background='rgba(255, 255, 255, 0.5)'">
+                                    <a href="rezervasyonlar.php?search=<?php echo urlencode($offer['customer_name']); ?>" style="display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.25); text-decoration: none; transition: var(--transition);" onmouseover="this.style.background='rgba(255, 255, 255, 0.8)'" onmouseout="this.style.background='rgba(255, 255, 255, 0.5)'">
                                         <div style="display: flex; justify-content: space-between; align-items: center;">
                                             <strong style="font-size: 0.82rem; color: var(--text-main);"><?php echo e($offer['customer_name']); ?></strong>
                                             <span style="font-size: 0.72rem; color: var(--primary); font-weight: 700;"><?php echo formatPrice($offer['total_price']); ?></span>
@@ -194,7 +194,7 @@ $pendingCount = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status = 'pendi
                             <?php endif; ?>
                         </div>
                         <div style="border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; text-align: center;">
-                            <a href="/admin/rezervasyonlar.php" style="font-size: 0.8rem; font-weight: 700; color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                            <a href="rezervasyonlar.php" style="font-size: 0.8rem; font-weight: 700; color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
                                 Tümünü Gör <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i>
                             </a>
                         </div>
