@@ -3,14 +3,17 @@ require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/Booking.php';
 
 class WhatsAppService {
-    private static $serviceUrl = 'http://localhost:3099';
     private static $sentBookings = [];
+
+    public static function getServiceUrl() {
+        return getSetting('whatsapp_service_url', 'http://localhost:3099');
+    }
 
     /**
      * WhatsApp Servisinin durumunu kontrol et
      */
     public static function getStatus() {
-        $ch = curl_init(self::$serviceUrl . '/status');
+        $ch = curl_init(self::getServiceUrl() . '/status');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 3);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
@@ -98,7 +101,7 @@ class WhatsAppService {
             ];
 
             // Node.js HTTP POST Gönderimi
-            $ch = curl_init(self::$serviceUrl . '/send-booking');
+            $ch = curl_init(self::getServiceUrl() . '/send-booking');
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));

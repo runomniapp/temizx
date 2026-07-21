@@ -2,11 +2,23 @@
 require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/../classes/WhatsAppService.php';
 
+$msg = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_whatsapp_url') {
+    $url = trim($_POST['whatsapp_service_url']);
+    if (!empty($url)) {
+        updateSetting('whatsapp_service_url', $url);
+        $msg = '<div style="background-color: #ecfdf5; color: var(--success); padding: 12px 18px; border-radius: 10px; margin-bottom: 20px; font-weight: 600;"><i class="fa-solid fa-circle-check"></i> WhatsApp Servis adresi başarıyla güncellendi!</div>';
+    }
+}
+
 $statusData = WhatsAppService::getStatus();
 $status = $statusData['status'] ?? 'OFFLINE';
+$currentServiceUrl = WhatsAppService::getServiceUrl();
 ?>
 
 <div class="main-content">
+    <?php echo $msg; ?>
+
     <div class="content-header" style="margin-bottom: 30px;">
         <div>
             <h1 style="font-size: 1.75rem; font-weight: 800; color: #1e293b; margin-bottom: 6px;">
@@ -89,6 +101,19 @@ $status = $statusData['status'] ?? 'OFFLINE';
                 <li><strong>Çalışana Gönderim:</strong> Görevli personele tarih, saat, müşteri adı ve adres iletilir.</li>
                 <li><strong>Müşteriye Gönderim:</strong> Müşteriye tarih, saat, görevli ekip isimleri ve Olifa Temizlik teşekkür mesajı iletilir.</li>
             </ul>
+        </div>
+
+        <!-- Service URL Settings Card -->
+        <div style="background: #fff; padding: 24px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid #e2e8f0; grid-column: 1 / -1;">
+            <span style="font-weight: 700; color: #475569; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 12px;">Servis Bağlantı Adresi (Webhook URL)</span>
+            <form method="POST" style="display: flex; gap: 12px; align-items: center;">
+                <input type="hidden" name="action" value="save_whatsapp_url">
+                <input type="text" name="whatsapp_service_url" value="<?php echo e($currentServiceUrl); ?>" class="form-input" style="flex: 1; padding: 10px 14px; border-radius: 10px; border: 1px solid #cbd5e1;" placeholder="http://localhost:3000">
+                <button type="submit" class="btn btn-primary" style="padding: 10px 20px; font-weight: 700; border-radius: 10px;">Kaydet</button>
+            </form>
+            <p style="color: #64748b; font-size: 0.82rem; margin-top: 8px; margin-bottom: 0;">
+                Varsayılan: <code>http://localhost:3000</code>. Eğer servisi ayrı bir VDS sunucuda veya yerel bilgisayarınızda (ngrok / sabit IP) çalıştırıyorsanız adresi buraya yazabilirsiniz.
+            </p>
         </div>
     </div>
 
