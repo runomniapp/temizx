@@ -6,7 +6,7 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3099;
 
 app.use(cors());
 app.use(express.json());

@@ -3,7 +3,7 @@ require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/Booking.php';
 
 class WhatsAppService {
-    private static $serviceUrl = 'http://localhost:3000';
+    private static $serviceUrl = 'http://localhost:3099';
     private static $sentBookings = [];
 
     /**
