@@ -214,24 +214,94 @@ $serviceUrl = WhatsAppService::getServiceUrl();
 
         <!-- Section 2: Node.js Service Settings Panel -->
         <div id="web_js_settings_panel" style="background: #fff; padding: 30px; border-radius: 18px; box-shadow: 0 4px 25px rgba(0,0,0,0.03); border: 1px solid #e2e8f0; display: <?php echo ($currentProvider === 'web_js') ? 'block' : 'none'; ?>;">
-            <h3 style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 0 0 15px 0;">
-                <i class="fa-solid fa-server" style="color: #2563eb; margin-right: 6px;"></i> Node.js Mikroservis Ayarları
-            </h3>
-            <div class="form-group" style="margin-bottom: 20px;">
-                <label class="form-label" style="font-weight: 700; font-size: 0.9rem; color: #334155; margin-bottom: 6px; display: block;">
-                    Servis Bağlantı Adresi (Webhook URL)
-                </label>
-                <input type="text" name="whatsapp_service_url" value="<?php echo e($serviceUrl); ?>" class="form-control" style="font-size: 0.9rem; padding: 12px 16px; border-radius: 12px; border: 1px solid #cbd5e1;" placeholder="http://localhost:3099">
-                <span style="font-size: 0.82rem; color: #64748b; margin-top: 6px; display: block;">
-                    Varsayılan: <code>http://localhost:3099</code>. Özel VDS sunucunuz varsa IP adresini girebilirsiniz.
-                </span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #f1f5f9; padding-bottom: 15px;">
+                <div>
+                    <h3 style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 0 0 4px 0;">
+                        <i class="fa-solid fa-qrcode" style="color: #2563eb; margin-right: 6px;"></i> Node.js WhatsApp Web & QR Kodu Bağlantısı
+                    </h3>
+                    <p style="color: #64748b; font-size: 0.88rem; margin: 0;">
+                        Telefonunuz ile QR kodunu taratarak sistemi WhatsApp hesabınıza doğrudan bağlayabilirsiniz.
+                    </p>
+                </div>
             </div>
-            <button type="submit" class="btn btn-primary" style="padding: 12px 24px; font-weight: 700; border-radius: 12px; font-size: 0.95rem;">
-                <i class="fa-solid fa-floppy-disk"></i> Node.js Servis Adresini Kaydet
-            </button>
+
+            <!-- QR Code Scan Container -->
+            <div style="text-align: center; padding: 20px 0;">
+                <?php if ($currentProvider === 'web_js' && $status === 'QR_READY' && !empty($statusData['qr'])): ?>
+                    <div style="background: #f8fafc; padding: 24px; border-radius: 18px; border: 2px dashed #cbd5e1; display: inline-block; max-width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.04);">
+                        <span style="background: #fef3c7; color: #b45309; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 15px;">
+                            <span style="width: 8px; height: 8px; background: #f59e0b; border-radius: 50%; display: inline-block;"></span> QR Kod Taraması Bekleniyor
+                        </span>
+                        <p style="color: #475569; font-size: 0.9rem; margin-bottom: 15px; font-weight: 600;">
+                            Telefonunuzda WhatsApp'ı açıp <strong>Bağlı Cihazlar > Cihaz Bağla</strong> kısmından aşağıdaki QR kodunu taratın:
+                        </p>
+                        <div style="display: inline-block; padding: 14px; background: #fff; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                            <img src="<?php echo $statusData['qr']; ?>" alt="WhatsApp QR Code" style="width: 250px; height: 250px; display: block; margin: 0 auto;">
+                        </div>
+                        <p style="color: #94a3b8; font-size: 0.8rem; margin-top: 15px; margin-bottom: 0;">
+                            <i class="fa-solid fa-rotate-right fa-spin"></i> QR Kod her 20 saniyede bir otomatik güncellenir.
+                        </p>
+                    </div>
+                <?php elseif ($currentProvider === 'web_js' && $status === 'READY'): ?>
+                    <div style="padding: 30px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 18px; color: #166534; display: inline-block; max-width: 480px;">
+                        <i class="fa-solid fa-circle-check" style="font-size: 3.5rem; color: #22c55e; margin-bottom: 12px;"></i>
+                        <h3 style="margin: 0 0 6px 0; font-size: 1.25rem; font-weight: 800;">WhatsApp Web Başarıyla Bağlandı!</h3>
+                        <p style="margin: 0 0 10px 0; font-size: 0.9rem; color: #15803d;">
+                            Hesap: <strong><?php echo e($statusData['info']['name'] ?? 'OLiFA WhatsApp'); ?></strong> (+<?php echo e($statusData['info']['phone'] ?? '-'); ?>)
+                        </p>
+                        <span style="font-size: 0.82rem; color: #166534; background: #dcfce7; padding: 4px 12px; border-radius: 20px; font-weight: 600; display: inline-block;">
+                            Oluşturulan randevularda mesajlar otomatik iletilecektir.
+                        </span>
+                    </div>
+                <?php elseif ($currentProvider === 'web_js' && $status === 'INITIALIZING'): ?>
+                    <div style="padding: 35px; background: #fffbeb; border: 1px dashed #fcd34d; border-radius: 18px; color: #92400e; display: inline-block; max-width: 460px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 3rem; color: #f59e0b; margin-bottom: 15px;"></i>
+                        <h3 style="margin: 0 0 6px 0; font-size: 1.15rem; font-weight: 700;">WhatsApp Sanal Tarayıcı Başlatılıyor...</h3>
+                        <p style="margin: 0; font-size: 0.88rem; color: #b45309;">
+                            Sanal Chrome arka planda yükleniyor. QR Kod hazırlanıyor, lütfen 5-10 saniye bekleyin (sayfa otomatik yenilenecektir).
+                        </p>
+                    </div>
+                <?php else: ?>
+                    <div style="padding: 30px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 18px; color: #991b1b; display: inline-block; max-width: 480px; text-align: left;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                            <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.5rem; color: #ef4444;"></i>
+                            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Node.js Mikroservisi Çevrimdışı</h3>
+                        </div>
+                        <p style="margin: 0 0 12px 0; font-size: 0.88rem; color: #7f1d1d; line-height: 1.5;">
+                            Arka planda çalışan Node.js WhatsApp mikroservisine ulaşılamıyor.
+                        </p>
+                        <div style="background: #0f172a; color: #38bdf8; padding: 10px 14px; border-radius: 10px; font-family: monospace; font-size: 0.85rem; margin-bottom: 12px;">
+                            cd whatsapp-service && npm start
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Optional Custom Microservice URL Field -->
+            <div style="margin-top: 25px; border-top: 1px solid #f1f5f9; padding-top: 20px;">
+                <details>
+                    <summary style="cursor: pointer; font-size: 0.85rem; font-weight: 700; color: #64748b; user-select: none;">
+                        <i class="fa-solid fa-gear"></i> Gelişmiş Servis Adresi / Webhook Bağlantı Ayarı (İsteğe Bağlı)
+                    </summary>
+                    <div style="margin-top: 12px; background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label class="form-label" style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 4px; display: block;">
+                                Servis URL (Webhook Adresi)
+                            </label>
+                            <input type="text" name="whatsapp_service_url" value="<?php echo e($serviceUrl); ?>" class="form-control" style="font-size: 0.88rem; padding: 10px 14px; border-radius: 10px; border: 1px solid #cbd5e1;" placeholder="http://localhost:3099">
+                        </div>
+                    </div>
+                </details>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button type="submit" class="btn btn-primary" style="padding: 12px 24px; font-weight: 700; border-radius: 12px; font-size: 0.95rem; background: #2563eb; border-color: #2563eb; color: #fff;">
+                    <i class="fa-solid fa-floppy-disk"></i> Node.js Servis Tercihini Kaydet
+                </button>
+            </div>
         </div>
 
-    </form>
+    </form><?php echo "\n"; ?>
 
     <!-- Test Message Sender Card -->
     <?php if ($currentProvider === 'cloud_api'): ?>
