@@ -1,9 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const QRCode = require('qrcode');
-const qrcodeTerminal = require('qrcode-terminal');
-const { Client, LocalAuth } = require('whatsapp-web.js');
 const path = require('path');
+const pino = require('pino');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 
 const app = express();
 const PORT = process.env.PORT || 3099;
@@ -11,12 +11,17 @@ const PORT = process.env.PORT || 3099;
 app.use(cors());
 app.use(express.json());
 
-// Global state tracking
-let qrCodeData = null;
+// Global State
+let sock = null;
 let qrCodeDataURL = null;
-let clientStatus = 'INITIALIZING'; // INITIALIZING, QR_READY, AUTHENTICATED, READY, DISCONNECTED
+let clientStatus = 'INITIALIZING'; // INITIALIZING, QR_READY, READY, DISCONNECTED, OFFLINE
 let clientInfo = null;
 let lastError = null;
+
+// Anti-ban message queue (10s delay)
+const messageQueue = [];
+let isProcessingQueue = false;
+const recentlyProcessedBookings = new Map();
 
 // Helper to format Turkish time slot
 function formatTimeSlot(slot) {
@@ -39,13 +44,12 @@ function formatDate(dateStr) {
     return dateStr;
 }
 
-// Helper to format Turkish phone numbers to WhatsApp ID format (e.g. 905XXXXXXXXX@c.us)
+// Helper to format Turkish phone numbers to Baileys JID format (905XXXXXXXXX@s.whatsapp.net)
 function formatPhoneNumber(phoneStr) {
     if (!phoneStr) return null;
     let clean = phoneStr.replace(/\D/g, '');
     if (!clean) return null;
 
-    // Handle Turkish number variations
     if (clean.length === 10 && clean.startsWith('5')) {
         clean = '90' + clean;
     } else if (clean.length === 11 && clean.startsWith('05')) {
@@ -56,319 +60,190 @@ function formatPhoneNumber(phoneStr) {
         clean = '90' + clean;
     }
 
-    return clean + '@c.us';
+    return clean + '@s.whatsapp.net';
 }
 
-console.log('Initializing WhatsApp Client...');
+console.log('Initializing Baileys WhatsApp Engine (Pure Node.js Sockets)...');
 
-const client = new Client({
-    authStrategy: new LocalAuth({
-        dataPath: path.join(__dirname, '.wwebjs_auth')
-    }),
-    puppeteer: {
-        headless: true,
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu',
-            '--disable-blink-features=AutomationControlled'
-        ]
-    }
-});
-
-client.on('qr', async (qr) => {
-    clientStatus = 'QR_READY';
-    qrCodeData = qr;
+async function startBaileys() {
     try {
-        qrCodeDataURL = await QRCode.toDataURL(qr);
+        const authFolder = path.join(__dirname, 'baileys_auth_info');
+        const { state, saveCreds } = await useMultiFileAuthState(authFolder);
+        
+        let version = [2, 3000, 1015901307];
+        try {
+            const versionRes = await fetchLatestBaileysVersion();
+            if (versionRes && versionRes.version) version = versionRes.version;
+        } catch(e) {
+            console.log('Using default Baileys version');
+        }
+
+        sock = makeWASocket({
+            version,
+            auth: state,
+            logger: pino({ level: 'silent' }),
+            browser: ['OLiFA Temizlik', 'Chrome', '1.0.0'],
+            generateHighQualityLinkPreview: false
+        });
+
+        sock.ev.on('creds.update', saveCreds);
+
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+
+            if (qr) {
+                clientStatus = 'QR_READY';
+                try {
+                    qrCodeDataURL = await QRCode.toDataURL(qr);
+                    console.log('--- BAILEYS QR KODU OLUŞTURULDU ---');
+                } catch (err) {
+                    console.error('QR Data URL üretilemedi:', err);
+                }
+            }
+
+            if (connection === 'open') {
+                clientStatus = 'READY';
+                qrCodeDataURL = null;
+                lastError = null;
+                const user = sock.user;
+                const cleanPhone = user ? (user.id || '').split(':')[0].split('@')[0] : '';
+                clientInfo = {
+                    name: (user && user.name) ? user.name : 'OLiFA WhatsApp',
+                    phone: cleanPhone
+                };
+                console.log('--- BAILEYS WHATSAPP BAŞARIYLA BAĞLANDI! ---', clientInfo);
+            }
+
+            if (connection === 'close') {
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = (statusCode !== DisconnectReason.loggedOut);
+                console.log('Baileys bağlantı kapandı. Reconnect edilecek mi:', shouldReconnect);
+                
+                if (shouldReconnect) {
+                    clientStatus = 'INITIALIZING';
+                    setTimeout(startBaileys, 3000);
+                } else {
+                    clientStatus = 'DISCONNECTED';
+                    qrCodeDataURL = null;
+                }
+            }
+        });
+
     } catch (err) {
-        console.error('Failed to generate QR Data URL:', err);
+        console.error('Baileys başlatma hatası:', err);
+        clientStatus = 'OFFLINE';
+        lastError = err.message;
     }
-    console.log('\n--- WHATSAPP WEB QR KODU HAZIR ---');
-    console.log('Terminalden de taratabilirsiniz veya http://localhost:3000/qr adresine gidiniz:\n');
-    qrcodeTerminal.generate(qr, { small: true });
-});
+}
 
-client.on('authenticated', () => {
-    clientStatus = 'AUTHENTICATED';
-    qrCodeData = null;
-    qrCodeDataURL = null;
-    console.log('WhatsApp Web Oturumu Doğrulandı (AUTHENTICATED)!');
-});
+startBaileys();
 
-client.on('ready', () => {
-    clientStatus = 'READY';
-    qrCodeData = null;
-    qrCodeDataURL = null;
-    clientInfo = client.info;
-    console.log('WhatsApp İstemcisi Kullanıma Hazır (READY)!');
-    if (clientInfo) {
-        console.log(`Bağlı Hesap: ${clientInfo.pushname || 'Olifa Temizlik'} (${clientInfo.wid.user})`);
-    }
-});
-
-client.on('auth_failure', (msg) => {
-    clientStatus = 'DISCONNECTED';
-    lastError = 'Kimlik doğrulama hatası: ' + msg;
-    console.error('WhatsApp Kimlik Doğrulama Hatası:', msg);
-});
-
-client.on('disconnected', (reason) => {
-    clientStatus = 'DISCONNECTED';
-    lastError = 'Bağlantı kesildi: ' + reason;
-    qrCodeData = null;
-    qrCodeDataURL = null;
-    console.log('WhatsApp Bağlantısı Kesildi:', reason);
-});
-
-client.initialize().catch(err => {
-    console.error('Client initialization failed:', err);
-    clientStatus = 'DISCONNECTED';
-    lastError = err.message;
-});
-
-// --- API Endpoints ---
-
-// Status endpoint
-app.get('/status', (req, res) => {
-    res.json({
-        status: clientStatus,
-        qr: qrCodeDataURL,
-        info: clientInfo ? {
-            name: clientInfo.pushname,
-            phone: clientInfo.wid ? clientInfo.wid.user : null
-        } : null,
-        lastError: lastError
-    });
-});
-
-// HTML page for QR code viewing
-app.get('/qr', (req, res) => {
-    if (clientStatus === 'READY') {
-        return res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <title>WhatsApp Bağlantısı Hazır</title>
-                <style>
-                    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f0fdf4; color: #166534; margin: 0; }
-                    .card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; max-width: 400px; }
-                    .icon { font-size: 64px; color: #22c55e; margin-bottom: 20px; }
-                    h1 { margin: 0 0 10px 0; font-size: 24px; }
-                    p { color: #4b5563; font-size: 15px; }
-                </style>
-            </head>
-            <body>
-                <div class="card">
-                    <div class="icon">✅</div>
-                    <h1>WhatsApp Zaten Bağlı</h1>
-                    <p>Olifa Temizlik Şirketi WhatsApp Web servisi aktif ve çalışıyor.</p>
-                </div>
-            </body>
-            </html>
-        `);
-    }
-
-    if (clientStatus === 'QR_READY' && qrCodeDataURL) {
-        return res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <title>WhatsApp QR Kod Taraması</title>
-                <meta http-equiv="refresh" content="15">
-                <style>
-                    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
-                    .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); text-align: center; max-width: 440px; width: 100%; }
-                    img { border-radius: 12px; border: 2px solid #e2e8f0; padding: 10px; background: #fff; margin: 20px 0; width: 260px; height: 260px; }
-                    h1 { margin: 0 0 10px 0; font-size: 22px; color: #0f172a; }
-                    p { color: #64748b; font-size: 14px; line-height: 1.5; margin-bottom: 5px; }
-                    .steps { text-align: left; background: #f1f5f9; padding: 15px 20px; border-radius: 12px; margin-top: 20px; font-size: 13px; color: #334155; }
-                    .steps ol { margin: 0; padding-left: 20px; }
-                    .steps li { margin-bottom: 5px; }
-                </style>
-            </head>
-            <body>
-                <div class="card">
-                    <h1>Olifa WhatsApp Bağlantısı</h1>
-                    <p>Lütfen WhatsApp mobil uygulamanızdan bu QR kodu taratın.</p>
-                    <img src="${qrCodeDataURL}" alt="WhatsApp QR Code" />
-                    <div class="steps">
-                        <strong>Nasıl Taranır?</strong>
-                        <ol>
-                            <li>Telefonunuzda WhatsApp'ı açın</li>
-                            <li>Menü (⋮) veya Ayarlar'a dokunun</li>
-                            <li><strong>Bağlı Cihazlar</strong> seçeneğine tıklayın</li>
-                            <li><strong>Cihaz Bağla</strong> butonuna basıp ekranı taratın</li>
-                        </ol>
-                    </div>
-                </div>
-            </body>
-            </html>
-        `);
-    }
-
-    return res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>WhatsApp Durumu</title>
-            <meta http-equiv="refresh" content="5">
-            <style>
-                body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f8fafc; color: #1e293b; margin: 0; }
-                .card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; max-width: 400px; }
-                p { color: #64748b; }
-            </style>
-        </head>
-        <body>
-            <div class="card">
-                <h2>Olifa WhatsApp Servisi Başlatılıyor...</h2>
-                <p>Mevcut Durum: <strong>${clientStatus}</strong></p>
-                <p>Sayfa otomatik yenileniyor...</p>
-            </div>
-        </body>
-        </html>
-    `);
-});
-
-// Helper for delay
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-// Message queue mechanism to ensure 10 seconds delay between ANY outgoing message
-const messageQueue = [];
-let isProcessingQueue = false;
-
+// Process Message Queue
 async function processMessageQueue() {
     if (isProcessingQueue) return;
     isProcessingQueue = true;
 
     while (messageQueue.length > 0) {
-        const task = messageQueue.shift();
-        try {
-            let targetChatId = task.chatId;
-            try {
-                const numberDetails = await client.getNumberId(targetChatId);
-                if (numberDetails && numberDetails._serialized) {
-                    targetChatId = numberDetails._serialized;
-                }
-            } catch (numErr) {
-                // Keep original chatId as fallback
-            }
+        const item = messageQueue.shift();
+        const { jid, recipientName, message } = item;
 
-            await client.sendMessage(targetChatId, task.message);
-            console.log(`[Queue] WhatsApp mesajı başarıyla gönderildi: ${task.recipientName} (${targetChatId})`);
+        try {
+            if (clientStatus === 'READY' && sock) {
+                console.log(`Sending message to ${recipientName} (${jid})...`);
+                await sock.sendMessage(jid, { text: message });
+                console.log(`Successfully sent to ${recipientName}`);
+            } else {
+                console.log(`Skipping message to ${recipientName}: WhatsApp not ready (${clientStatus})`);
+            }
         } catch (err) {
-            console.error(`[Queue] Mesaj gönderme hatası (${task.recipientName} - ${task.chatId}):`, err.message);
+            console.error(`Failed to send message to ${recipientName}:`, err);
         }
 
-        // If there are more messages waiting in queue, wait 10 seconds before sending the next one
+        // Wait 10 seconds anti-ban delay
         if (messageQueue.length > 0) {
-            console.log(`[Queue] Anti-ban koruması: Sonraki mesaj için 10 saniye bekleniyor...`);
-            await delay(10000);
+            await new Promise(resolve => setTimeout(resolve, 10000));
         }
     }
 
     isProcessingQueue = false;
 }
 
-// Deduplication cache to prevent duplicate notifications for the same booking within 60 seconds
-const recentlyProcessedBookings = new Set();
+// 1. Connection Status API
+app.get('/status', (req, res) => {
+    res.json({
+        status: clientStatus,
+        qr: qrCodeDataURL,
+        info: clientInfo,
+        lastError: lastError,
+        engine: 'Baileys Pure JS Sockets'
+    });
+});
 
-// Endpoint to send WhatsApp notifications for a booking
+// 2. Send Booking Notification Queue Endpoint
 app.post('/send-booking', async (req, res) => {
-    if (clientStatus !== 'READY') {
-        return res.status(503).json({
-            success: false,
-            message: 'WhatsApp istemcisi hazır değil. Mevcut durum: ' + clientStatus
-        });
-    }
-
     try {
+        if (clientStatus !== 'READY' || !sock) {
+            return res.status(503).json({
+                success: false,
+                message: 'WhatsApp servisi henüz bağlı değil.'
+            });
+        }
+
         const { booking_id, customer, booking_date, time_slot, service_name, employees } = req.body;
 
         if (!customer || !customer.phone) {
-            return res.status(400).json({ success: false, message: 'Müşteri telefon numarası eksik.' });
+            return res.status(400).json({ success: false, message: 'Müşteri telefon bilgisi eksik.' });
         }
 
-        // Deduplication check
+        // 60-second deduplication
         if (booking_id) {
-            if (recentlyProcessedBookings.has(booking_id)) {
-                console.log(`[Dedup] Randevu #${booking_id} için son 60 saniye içinde bildirim tetiklenmişti. Çift gönderim engellendi.`);
+            const now = Date.now();
+            const lastProcessed = recentlyProcessedBookings.get(booking_id);
+            if (lastProcessed && (now - lastProcessed < 60000)) {
                 return res.json({
                     success: true,
-                    message: 'Bu randevu için yakın zamanda bildirim gönderildiği için çift gönderim engellendi.'
+                    message: 'Bu rezervasyon için mesajlar son 60 saniye içinde zaten iletildi.'
                 });
             }
-            recentlyProcessedBookings.add(booking_id);
-            setTimeout(() => {
-                recentlyProcessedBookings.delete(booking_id);
-            }, 60000);
+            recentlyProcessedBookings.set(booking_id, now);
         }
 
+        const customerJid = formatPhoneNumber(customer.phone);
         const formattedDateStr = formatDate(booking_date);
         const formattedSlotStr = formatTimeSlot(time_slot);
         const serviceTitle = service_name || 'Temizlik Hizmeti';
 
-        const employeeNamesList = (employees && employees.length > 0)
-            ? employees.map(e => e.name).join(', ')
-            : 'Genel Temizlik Ekibimiz';
+        let empNamesList = [];
+        if (Array.isArray(employees) && employees.length > 0) {
+            empNamesList = employees.map(e => e.name).filter(Boolean);
+        }
+        const assignedTeamStr = empNamesList.length > 0 ? empNamesList.join(', ') : 'Ekip Atanıyor';
 
         let queuedCount = 0;
 
-        // 1. Add Customer Message to Queue
-        const customerChatId = formatPhoneNumber(customer.phone);
-        if (customerChatId) {
-            const customerMsg = 
-`Sayın *${customer.name || 'Müşterimiz'}*,
-
-Olifa Temizlik Şirketi'ni tercih ettiğiniz için teşekkür ederiz! 🌸
-
-Randevunuz başarıyla onaylanmıştır:
-📅 *Tarih:* ${formattedDateStr}
-⏰ *Saat:* ${formattedSlotStr}
-🧹 *Hizmet:* ${serviceTitle}
-👷 *Temizliğe Gelecek Personeller:* ${employeeNamesList}
-
-Sorularınız veya değişiklik talepleriniz için bu hat üzerinden bizimle iletişime geçebilirsiniz. İyi günler dileriz! ✨`;
+        // Customer Message
+        if (customerJid) {
+            const customerMsg = `✨ *OLiFA TEMİZLİK BİLDİRİMİ*\n\nSayın *${customer.name}*,\nRezervasyonunuz başarıyla onaylanmıştır.\n\n🧹 *Hizmet:* ${serviceTitle}\n📅 *Tarih:* ${formattedDateStr}\n⏰ *Saat Dilimi:* ${formattedSlotStr}\n👷‍♂️ *Görevli Ekip:* ${assignedTeamStr}\n\nBizi tercih ettiğiniz için teşekkür ederiz!`;
 
             messageQueue.push({
-                chatId: customerChatId,
+                jid: customerJid,
                 recipientName: `Müşteri: ${customer.name}`,
                 message: customerMsg
             });
             queuedCount++;
         }
 
-        // 2. Add Employee Messages to Queue
-        if (employees && Array.isArray(employees) && employees.length > 0) {
+        // Employees Messages
+        if (Array.isArray(employees)) {
             for (const emp of employees) {
                 if (!emp.phone) continue;
-                const empChatId = formatPhoneNumber(emp.phone);
-                if (!empChatId) continue;
+                const empJid = formatPhoneNumber(emp.phone);
+                if (!empJid) continue;
 
-                const employeeMsg = 
-`Merhaba *${emp.name}*,
-
-Yeni bir temizlik görevi atandı! 🧹
-
-📅 *Tarih:* ${formattedDateStr}
-⏰ *Saat Aralığı:* ${formattedSlotStr}
-👤 *Müşteri:* ${customer.name || 'Belirtilmedi'}
-📞 *Müşteri Tel:* ${customer.phone || 'Belirtilmedi'}
-📍 *Adres:* ${customer.address || 'Belirtilmedi'}
-🧹 *Hizmet:* ${serviceTitle}
-
-Lütfen randevu saatinde adreste olmaya özen gösteriniz. İyi çalışmalar!`;
+                const employeeMsg = `📋 *YENİ GÖREV ATAMASI (OLiFA TEMİZLİK)*\n\nSayın *${emp.name}*,\nYeni bir temizlik görevi atanmıştır:\n\n📅 *Tarih:* ${formattedDateStr}\n⏰ *Saat Aralığı:* ${formattedSlotStr}\n👤 *Müşteri:* ${customer.name || 'Belirtilmedi'}\n📞 *Müşteri Tel:* ${customer.phone || 'Belirtilmedi'}\n📍 *Adres:* ${customer.address || 'Belirtilmedi'}\n🧹 *Hizmet:* ${serviceTitle}\n\nLütfen randevu saatinde adreste olmaya özen gösteriniz. İyi çalışmalar!`;
 
                 messageQueue.push({
-                    chatId: empChatId,
+                    jid: empJid,
                     recipientName: `Çalışan: ${emp.name}`,
                     message: employeeMsg
                 });
@@ -376,7 +251,6 @@ Lütfen randevu saatinde adreste olmaya özen gösteriniz. İyi çalışmalar!`;
             }
         }
 
-        // Start processing queue in background
         processMessageQueue();
 
         return res.json({
@@ -392,5 +266,5 @@ Lütfen randevu saatinde adreste olmaya özen gösteriniz. İyi çalışmalar!`;
 });
 
 app.listen(PORT, () => {
-    console.log(`Olifa WhatsApp Microservice running on http://localhost:${PORT}`);
+    console.log(`Olifa Baileys WhatsApp Microservice running on http://localhost:${PORT}`);
 });
