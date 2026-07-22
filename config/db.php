@@ -64,6 +64,16 @@ function getSetting($key, $default = '') {
     return isset($settings[$key]) ? $settings[$key] : $default;
 }
 
+// Helper to update or insert system settings
+function updateSetting($key, $value) {
+    global $pdo, $settings;
+    if (!$pdo) return false;
+    $stmt = $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+    $result = $stmt->execute([$key, $value]);
+    $settings[$key] = $value;
+    return $result;
+}
+
 // CSRF Token generation & verification
 if (!isset($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
