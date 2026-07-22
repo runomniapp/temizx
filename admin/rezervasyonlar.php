@@ -227,6 +227,24 @@ function getCategoryShortInfo($categoryName) {
 
 $allPackages = $packageModel->getAll(true);
 $allBookings = $bookingModel->getAll($filters);
+
+// Eğer URL'den bildirim tıklamasıyla özel bir id istenmişse ve listede yoksa ekle
+$openId = isset($_GET['open']) ? (int)$_GET['open'] : (isset($_GET['id']) && !isset($_GET['action']) ? (int)$_GET['id'] : 0);
+if ($openId > 0) {
+    $exists = false;
+    foreach ($allBookings as $b) {
+        if ((int)$b['id'] === $openId) {
+            $exists = true;
+            break;
+        }
+    }
+    if (!$exists) {
+        $targetBooking = $bookingModel->getById($openId);
+        if ($targetBooking) {
+            array_unshift($allBookings, $targetBooking);
+        }
+    }
+}
 ?>
 
 <style>
@@ -814,9 +832,14 @@ $allBookings = $bookingModel->getAll($filters);
                 </div>
             </div>
             
-            <div class="modal-footer">
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
                 <button type="button" class="btn btn-outline" onclick="closeEditBookingModal()">Kapat</button>
-                <button type="submit" class="btn btn-primary">Değişiklikleri Kaydet</button>
+                <div style="display: flex; gap: 8px;">
+                    <button type="submit" onclick="document.getElementById('edit_booking_status').value='confirmed';" class="btn" style="background-color: #10b981; border-color: #10b981; color: #ffffff; font-weight: 700; border-radius: 10px; padding: 10px 18px; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-check"></i> Teklifi Onayla & Kaydet
+                    </button>
+                    <button type="submit" class="btn btn-primary" style="font-weight: 700; border-radius: 10px; padding: 10px 18px;">Değişiklikleri Kaydet</button>
+                </div>
             </div>
         </form>
     </div>
@@ -1697,6 +1720,26 @@ document.addEventListener('click', function(e) {
                 console.error('Edit verisi parse edilemedi:', err);
             }
         }
+    }
+});
+
+// URL'de open veya id parametresi varsa o rezervasyonun detay modalını otomatik aç
+document.addEventListener("DOMContentLoaded", function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const openId = urlParams.get('open') || urlParams.get('id');
+    if (openId) {
+        setTimeout(function() {
+            const editBtns = document.querySelectorAll('.action-btn[data-action="edit"]');
+            for (let b of editBtns) {
+                try {
+                    const rowData = JSON.parse(b.getAttribute('data-row') || '{}');
+                    if (parseInt(rowData.id) === parseInt(openId)) {
+                        openEditBooking(rowData);
+                        break;
+                    }
+                } catch(e){}
+            }
+        }, 150);
     }
 });
 </script>
