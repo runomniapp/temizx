@@ -60,6 +60,10 @@ try {
     ];
     
     $bookingId = $bookingModel->createBooking($bookingData);
+
+    // Yöneticiye WhatsApp yeni teklif bildirimi gönder
+    require_once __DIR__ . '/../classes/WhatsAppService.php';
+    WhatsAppService::sendNewBookingAdminNotification($bookingId);
     
     echo json_encode([
         'success' => true,

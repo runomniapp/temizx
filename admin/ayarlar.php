@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'site_keywords'    => $_POST['site_keywords'] ?? '',
             'phone'            => $_POST['phone'] ?? '',
             'whatsapp'         => $_POST['whatsapp'] ?? '',
+            'admin_whatsapp_phone' => $_POST['admin_whatsapp_phone'] ?? '',
             'email'            => $_POST['email'] ?? '',
             'address'          => $_POST['address'] ?? '',
             'work_hours'       => $_POST['work_hours'] ?? '',
@@ -79,14 +80,23 @@ $allSettings = $settingModel->getAll();
                 <input type="text" name="company_name" id="company_name" class="form-control" value="<?php echo e($allSettings['company_name'] ?? ''); ?>" required>
             </div>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px;">
                 <div class="form-group">
                     <label class="form-label" for="phone">Telefon Numarası</label>
                     <input type="text" name="phone" id="phone" class="form-control" value="<?php echo e($allSettings['phone'] ?? ''); ?>">
                 </div>
                 <div class="form-group">
-                    <label class="form-label" for="whatsapp">WhatsApp Numarası</label>
+                    <label class="form-label" for="whatsapp">Site Müşteri WhatsApp Hattı</label>
                     <input type="text" name="whatsapp" id="whatsapp" class="form-control" value="<?php echo e($allSettings['whatsapp'] ?? ''); ?>">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="admin_whatsapp_phone" style="color: #0284c7; font-weight: 800; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-brands fa-whatsapp" style="color: #22c55e; font-size: 1.1rem;"></i> Yönetici WhatsApp Bildirim Numarası
+                    </label>
+                    <input type="text" name="admin_whatsapp_phone" id="admin_whatsapp_phone" class="form-control" value="<?php echo e($allSettings['admin_whatsapp_phone'] ?? ''); ?>" placeholder="0543 201 00 97" style="border-color: #38bdf8;">
+                    <span style="font-size: 0.76rem; color: #64748b; margin-top: 4px; display: block;">
+                        Yeni bir teklif/randevu alındığında tüm müşteri ve adres detayları anında bu numaraya iletilir.
+                    </span>
                 </div>
             </div>
             

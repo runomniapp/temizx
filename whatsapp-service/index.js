@@ -179,6 +179,29 @@ app.get('/status', (req, res) => {
     });
 });
 
+// 1.5. Send Admin Alert Endpoint
+app.post('/send-admin-alert', async (req, res) => {
+    try {
+        if (clientStatus !== 'READY' || !sock) {
+            return res.status(503).json({ success: false, message: 'WhatsApp servisi henüz bağlı değil.' });
+        }
+        const { phone, message } = req.body;
+        if (!phone || !message) {
+            return res.status(400).json({ success: false, message: 'Telefon ve mesaj alanları zorunludur.' });
+        }
+        const adminJid = formatPhoneNumber(phone);
+        if (adminJid) {
+            console.log(`Sending Admin Alert to ${phone}...`);
+            await sock.sendMessage(adminJid, { text: message });
+            console.log(`Successfully sent Admin Alert to ${phone}`);
+        }
+        return res.json({ success: true, message: 'Yönetici uyarısı gönderildi.' });
+    } catch (err) {
+        console.error('Error in /send-admin-alert:', err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // 2. Send Booking Notification Queue Endpoint
 app.post('/send-booking', async (req, res) => {
     try {
