@@ -62,9 +62,16 @@ try {
     
     $bookingId = $bookingModel->createBooking($bookingData);
 
-    // Yöneticiye WhatsApp yeni teklif bildirimi gönder (Hataya karşı korumalı)
+    // 1. Müşteriye "Talebiniz Alındı" teyit mesajı gönder (Hataya karşı korumalı)
     try {
         require_once __DIR__ . '/../classes/WhatsAppService.php';
+        WhatsAppService::sendCustomerNewQuoteReceiptNotification($bookingId);
+    } catch (\Throwable $ntfErr) {
+        error_log("WhatsApp Customer Receipt Error: " . $ntfErr->getMessage());
+    }
+
+    // 2. Yöneticiye WhatsApp yeni teklif detay bildirimi gönder (Hataya karşı korumalı)
+    try {
         WhatsAppService::sendNewBookingAdminNotification($bookingId);
     } catch (\Throwable $ntfErr) {
         error_log("WhatsApp Admin Notification Error: " . $ntfErr->getMessage());

@@ -143,7 +143,143 @@ class WhatsAppService {
     }
 
     /**
-     * Bir rezervasyon için WhatsApp bildirimlerini tetikle
+     * 1. Müşteri web sitesinden yeni bir teklif talebi oluşturduğunda Müşteriye giden "Talebiniz Alındı" teyit mesajı
+     */
+    public static function sendCustomerNewQuoteReceiptNotification($bookingId) {
+        if (empty($bookingId)) return ['success' => false, 'message' => 'Geçersiz ID'];
+
+        try {
+            $bookingModel = new Booking();
+            $booking = $bookingModel->getById($bookingId);
+            if (!$booking || empty($booking['customer_phone'])) {
+                return ['success' => false, 'message' => 'Geçersiz müşteri telefon bilgisi.'];
+            }
+
+            $serviceName = $booking['category_name'];
+            if (!empty($booking['subcategory_name'])) {
+                $serviceName .= ' - ' . $booking['subcategory_name'];
+            } elseif (!empty($booking['package_name'])) {
+                $serviceName .= ' (' . $booking['package_name'] . ')';
+            }
+
+            $dateFormatted = date('d.m.Y', strtotime($booking['booking_date']));
+            $timeSlotStr = translateTimeSlot($booking['booking_time_slot']);
+
+            $receiptMsg = "✨ *OLiFA TEMİZLİK BİLDİRİMİ*\n\n"
+                . "Sayın *" . $booking['customer_name'] . "*,\n"
+                . "Temizlik talebiniz tarafımıza ulaşmıştır. Yetkililerimiz en kısa sürede talebinizi inceleyip sizinle iletişime geçecektir.\n\n"
+                . "🧹 *Talep Edilen Hizmet:* " . $serviceName . "\n"
+                . "📅 *Tarih:* " . $dateFormatted . "\n"
+                . "⏰ *Saat Dilimi:* " . $timeSlotStr . "\n\n"
+                . "Bizi tercih ettiğiniz için teşekkür ederiz!";
+
+            $provider = self::getProviderType();
+            if ($provider === 'cloud_api') {
+                return self::sendCloudApiMessage($booking['customer_phone'], $receiptMsg);
+            } else {
+                $ch = curl_init(self::getServiceUrl() . '/send-admin-alert');
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+                    'phone' => $booking['customer_phone'],
+                    'message' => $receiptMsg
+                ]));
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
+                $response = curl_exec($ch);
+                curl_close($ch);
+
+                return ['success' => true];
+            }
+
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * 2. Yeni müşteri teklifi/randevusu oluşturulduğunda YÖNETİCİYE WhatsApp uyarısı gönder
+     */
+    public static function sendNewBookingAdminNotification($bookingId) {
+        if (empty($bookingId)) return ['success' => false, 'message' => 'Geçersiz ID'];
+
+        $adminPhone = getSetting('admin_whatsapp_phone', '');
+        if (empty($adminPhone)) {
+            $adminPhone = getSetting('whatsapp', getSetting('phone', ''));
+        }
+
+        if (empty($adminPhone)) {
+            return ['success' => false, 'message' => 'Yönetici bildirim numarası tanımlanmamış.'];
+        }
+
+        try {
+            $bookingModel = new Booking();
+            $booking = $bookingModel->getById($bookingId);
+            if (!$booking) return ['success' => false, 'message' => 'Rezervasyon bulunamadı.'];
+
+            $serviceName = $booking['category_name'];
+            if (!empty($booking['subcategory_name'])) {
+                $serviceName .= ' - ' . $booking['subcategory_name'];
+            } elseif (!empty($booking['package_name'])) {
+                $serviceName .= ' (' . $booking['package_name'] . ')';
+            }
+
+            $dateFormatted = date('d.m.Y', strtotime($booking['booking_date']));
+            $timeSlotStr = translateTimeSlot($booking['booking_time_slot']);
+            $totalPriceStr = formatPrice($booking['total_price']);
+            $host = $_SERVER['HTTP_HOST'] ?? 'www.runall.app';
+            $openLink = "http://" . $host . "/temizx/admin/rezervasyonlar.php?open=" . $booking['id'];
+
+            $locationStr = '';
+            if (!empty($booking['customer_location'])) {
+                $locUrl = (strpos($booking['customer_location'], 'http') === 0)
+                    ? $booking['customer_location']
+                    : "https://www.google.com/maps/search/?api=1&query=" . urlencode($booking['customer_location']);
+                $locationStr = "\n📍 *Harita Konumu:* " . $locUrl;
+            }
+
+            $adminMsg = "🚨 *YENİ MÜŞTERİ RANDEVU TALEBİ / TEKLİFİ!*\n\n"
+                . "Sayın Yönetici, web sitenizden yeni bir teklif talebi oluşturuldu:\n\n"
+                . "👤 *Müşteri Adı:* " . $booking['customer_name'] . "\n"
+                . "📞 *Müşteri Tel:* " . $booking['customer_phone'] . "\n"
+                . "🧹 *Hizmet:* " . $serviceName . "\n"
+                . "📅 *Talep Tarihi:* " . $dateFormatted . "\n"
+                . "⏰ *Saat Dilimi:* " . $timeSlotStr . "\n"
+                . "🏠 *Adres:* " . $booking['customer_address']
+                . $locationStr . "\n"
+                . "💰 *Hesaplanan Tutar:* " . $totalPriceStr . "\n\n"
+                . "⚠️ *LÜTFEN SİSTEMDEN ONAYLAYIN:*\n"
+                . "Yönetim paneline girerek personelleri atayınız ve teklifi onaylayınız.\n\n"
+                . "🔗 *Onaylama Linki:*\n" . $openLink;
+
+            $provider = self::getProviderType();
+            if ($provider === 'cloud_api') {
+                return self::sendCloudApiMessage($adminPhone, $adminMsg);
+            } else {
+                $ch = curl_init(self::getServiceUrl() . '/send-admin-alert');
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+                    'phone' => $adminPhone,
+                    'message' => $adminMsg
+                ]));
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
+                $response = curl_exec($ch);
+                curl_close($ch);
+
+                return ['success' => true];
+            }
+
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * 3. ADMIN TEKLİFİ ONAYLADIĞINDA: Müşteriye ve Atanan Çalışanlara Detaylı Bildirim Gönder
      */
     public static function sendBookingNotifications($bookingId) {
         if (empty($bookingId)) {
@@ -166,6 +302,11 @@ class WhatsAppService {
             $booking = $bookingModel->getById($bookingId);
             if (!$booking) {
                 return ['success' => false, 'message' => 'Rezervasyon bulunamadı.'];
+            }
+
+            // Sadece onaylanmış rezervasyonlar için bildirim gönder
+            if ($booking['status'] !== 'confirmed') {
+                return ['success' => false, 'message' => 'Rezervasyon henüz onaylanmamış.'];
             }
 
             // Hizmet adı
@@ -197,20 +338,28 @@ class WhatsAppService {
                 $dateFormatted = date('d.m.Y', strtotime($booking['booking_date']));
                 $timeSlotStr = translateTimeSlot($booking['booking_time_slot']);
 
-                // Müşteri Mesajı
-                $custMsg = "✨ *OLiFA TEMİZLİK BİLDİRİMİ*\n\n"
+                $locationStr = '';
+                if (!empty($booking['customer_location'])) {
+                    $locUrl = (strpos($booking['customer_location'], 'http') === 0)
+                        ? $booking['customer_location']
+                        : "https://www.google.com/maps/search/?api=1&query=" . urlencode($booking['customer_location']);
+                    $locationStr = "\n📍 *Harita Konumu:* " . $locUrl;
+                }
+
+                // Müşteri Onay Mesajı
+                $custMsg = "✨ *OLiFA TEMİZLİK - REZERVASYONUNUZ ONAYLANDI!*\n\n"
                     . "Sayın *" . $booking['customer_name'] . "*,\n"
-                    . "Rezervasyonunuz başarıyla onaylanmıştır.\n\n"
+                    . "Temizlik randevunuz başarıyla onaylanmıştır!\n\n"
                     . "🧹 *Hizmet:* " . $serviceName . "\n"
                     . "📅 *Tarih:* " . $dateFormatted . "\n"
                     . "⏰ *Saat Dilimi:* " . $timeSlotStr . "\n"
-                    . "👷‍♂️ *Görevli Ekip:* " . $empStr . "\n\n"
+                    . "👷‍♂️ *Görevli Ekibiniz:* " . $empStr . "\n\n"
                     . "Bizi tercih ettiğiniz için teşekkür ederiz!";
 
                 $custResult = self::sendCloudApiMessage($booking['customer_phone'], $custMsg);
                 if ($custResult['success']) $sentCount++;
 
-                // Çalışan Mesajları
+                // Çalışan Görev Mesajları
                 foreach ($employees as $emp) {
                     if (empty($emp['phone'])) continue;
 
@@ -218,12 +367,13 @@ class WhatsAppService {
                         . "Sayın *" . $emp['name'] . "*,\n"
                         . "Yeni bir temizlik görevi atanmıştır:\n\n"
                         . "📅 *Tarih:* " . $dateFormatted . "\n"
-                        . "⏰ *Saat:* " . $timeSlotStr . "\n"
+                        . "⏰ *Saat Aralığı:* " . $timeSlotStr . "\n"
                         . "👤 *Müşteri:* " . $booking['customer_name'] . "\n"
                         . "📞 *Müşteri Tel:* " . $booking['customer_phone'] . "\n"
-                        . "📍 *Adres:* " . $booking['customer_address'] . "\n"
+                        . "🏠 *Adres:* " . $booking['customer_address']
+                        . $locationStr . "\n"
                         . "🧹 *Hizmet:* " . $serviceName . "\n\n"
-                        . "Lütfen belirtilen saatte adreste bulununuz.";
+                        . "Lütfen randevu saatinde adreste olmaya özen gösteriniz. İyi çalışmalar!";
 
                     $empResult = self::sendCloudApiMessage($emp['phone'], $empMsg);
                     if ($empResult['success']) $sentCount++;
@@ -276,82 +426,6 @@ class WhatsAppService {
 
         } catch (Exception $e) {
             return ['success' => false, 'message' => 'WhatsApp bildirim hatası: ' . $e->getMessage()];
-        }
-    }
-
-    /**
-     * Yeni müşteri teklifi/randevusu oluşturulduğunda Yöneticiye WhatsApp uyarısı gönder
-     */
-    public static function sendNewBookingAdminNotification($bookingId) {
-        if (empty($bookingId)) return ['success' => false, 'message' => 'Geçersiz ID'];
-
-        $adminPhone = getSetting('admin_whatsapp_phone', '');
-        if (empty($adminPhone)) {
-            $adminPhone = getSetting('whatsapp', getSetting('phone', ''));
-        }
-
-        if (empty($adminPhone)) {
-            return ['success' => false, 'message' => 'Yönetici bildirim numarası tanımlanmamış.'];
-        }
-
-        try {
-            $bookingModel = new Booking();
-            $booking = $bookingModel->getById($bookingId);
-            if (!$booking) return ['success' => false, 'message' => 'Rezervasyon bulunamadı.'];
-
-            $serviceName = $booking['category_name'];
-            if (!empty($booking['subcategory_name'])) {
-                $serviceName .= ' - ' . $booking['subcategory_name'];
-            } elseif (!empty($booking['package_name'])) {
-                $serviceName .= ' (' . $booking['package_name'] . ')';
-            }
-
-            $dateFormatted = date('d.m.Y', strtotime($booking['booking_date']));
-            $timeSlotStr = translateTimeSlot($booking['booking_time_slot']);
-            $locationStr = '';
-            if (!empty($booking['customer_location'])) {
-                $locUrl = (strpos($booking['customer_location'], 'http') === 0)
-                    ? $booking['customer_location']
-                    : "https://www.google.com/maps/search/?api=1&query=" . urlencode($booking['customer_location']);
-                $locationStr = "\n📍 *Harita Konumu:* " . $locUrl;
-            }
-
-            $adminMsg = "🚨 *YENİ MÜŞTERİ RANDEVU TALEBİ / TEKLİFİ!*\n\n"
-                . "Sayın Yönetici, web sitenizden yeni bir randevu talebi oluşturuldu:\n\n"
-                . "👤 *Müşteri Adı:* " . $booking['customer_name'] . "\n"
-                . "📞 *Müşteri Tel:* " . $booking['customer_phone'] . "\n"
-                . "🧹 *Hizmet:* " . $serviceName . "\n"
-                . "📅 *Talep Tarihi:* " . $dateFormatted . "\n"
-                . "⏰ *Saat Dilimi:* " . $timeSlotStr . "\n"
-                . "🏠 *Adres:* " . $booking['customer_address']
-                . $locationStr . "\n"
-                . "💰 *Hesaplanan Tutar:* " . $totalPriceStr . "\n\n"
-                . "⚠️ *LÜTFEN SİSTEMDEN ONAYLAYIN:*\n"
-                . "Yönetim paneline girerek personelleri atayınız ve teklifi onaylayınız.\n\n"
-                . "🔗 *Onaylama Linki:*\n" . $openLink;
-
-            $provider = self::getProviderType();
-            if ($provider === 'cloud_api') {
-                return self::sendCloudApiMessage($adminPhone, $adminMsg);
-            } else {
-                $ch = curl_init(self::getServiceUrl() . '/send-admin-alert');
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_POST, true);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-                    'phone' => $adminPhone,
-                    'message' => $adminMsg
-                ]));
-                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 3);
-                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
-                $response = curl_exec($ch);
-                curl_close($ch);
-
-                return ['success' => true];
-            }
-
-        } catch (\Throwable $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 }
