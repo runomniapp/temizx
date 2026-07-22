@@ -18,7 +18,7 @@ let clientStatus = 'INITIALIZING'; // INITIALIZING, QR_READY, READY, DISCONNECTE
 let clientInfo = null;
 let lastError = null;
 
-// Anti-ban message queue (10s delay)
+// Anti-ban message queue (Strict 10s delay between ALL messages)
 const messageQueue = [];
 let isProcessingQueue = false;
 const recentlyProcessedBookings = new Map();
@@ -138,7 +138,7 @@ async function startBaileys() {
 
 startBaileys();
 
-// Process Message Queue
+// Process Message Queue - Strictly 10 seconds delay between EVERY message
 async function processMessageQueue() {
     if (isProcessingQueue) return;
     isProcessingQueue = true;
@@ -149,20 +149,18 @@ async function processMessageQueue() {
 
         try {
             if (clientStatus === 'READY' && sock) {
-                console.log(`Sending message to ${recipientName} (${jid})...`);
+                console.log(`[QUEUE] Sending message to ${recipientName} (${jid})...`);
                 await sock.sendMessage(jid, { text: message });
-                console.log(`Successfully sent to ${recipientName}`);
+                console.log(`[QUEUE] Successfully sent to ${recipientName}`);
             } else {
-                console.log(`Skipping message to ${recipientName}: WhatsApp not ready (${clientStatus})`);
+                console.log(`[QUEUE] Skipping message to ${recipientName}: WhatsApp not ready (${clientStatus})`);
             }
         } catch (err) {
-            console.error(`Failed to send message to ${recipientName}:`, err);
+            console.error(`[QUEUE] Failed to send message to ${recipientName}:`, err);
         }
 
-        // Wait 10 seconds anti-ban delay
-        if (messageQueue.length > 0) {
-            await new Promise(resolve => setTimeout(resolve, 10000));
-        }
+        // STRICTLY ALWAYS wait 10 seconds anti-ban delay after ANY message send
+        await new Promise(resolve => setTimeout(resolve, 10000));
     }
 
     isProcessingQueue = false;
@@ -179,7 +177,7 @@ app.get('/status', (req, res) => {
     });
 });
 
-// 1.5. Send Admin Alert Endpoint
+// 1.5. Send Admin Alert Endpoint (Pushed to Queue)
 app.post('/send-admin-alert', async (req, res) => {
     try {
         if (clientStatus !== 'READY' || !sock) {
@@ -191,11 +189,15 @@ app.post('/send-admin-alert', async (req, res) => {
         }
         const adminJid = formatPhoneNumber(phone);
         if (adminJid) {
-            console.log(`Sending Admin Alert to ${phone}...`);
-            await sock.sendMessage(adminJid, { text: message });
-            console.log(`Successfully sent Admin Alert to ${phone}`);
+            console.log(`Queueing Admin Alert for ${phone}...`);
+            messageQueue.push({
+                jid: adminJid,
+                recipientName: `Yönetici: ${phone}`,
+                message: message
+            });
+            processMessageQueue();
         }
-        return res.json({ success: true, message: 'Yönetici uyarısı gönderildi.' });
+        return res.json({ success: true, message: 'Yönetici uyarısı mesaj kuyruğuna eklendi (10 sn anti-ban korumalı).' });
     } catch (err) {
         console.error('Error in /send-admin-alert:', err);
         return res.status(500).json({ success: false, message: err.message });
@@ -242,6 +244,14 @@ app.post('/send-booking', async (req, res) => {
         }
         const assignedTeamStr = empNamesList.length > 0 ? empNamesList.join(', ') : 'Ekip Atanıyor';
 
+        let locationText = '';
+        if (customer.location) {
+            const locUrl = customer.location.startsWith('http')
+                ? customer.location
+                : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(customer.location)}`;
+            locationText = `\n📍 *Harita Konum Linki:*\n${locUrl}`;
+        }
+
         let queuedCount = 0;
 
         // Customer Message
@@ -263,7 +273,7 @@ app.post('/send-booking', async (req, res) => {
                 const empJid = formatPhoneNumber(emp.phone);
                 if (!empJid) continue;
 
-                const employeeMsg = `📋 *YENİ GÖREV ATAMASI (OLiFA TEMİZLİK)*\n\nSayın *${emp.name}*,\nYeni bir temizlik görevi atanmıştır:\n\n📅 *Tarih:* ${formattedDateStr}\n⏰ *Saat Aralığı:* ${formattedSlotStr}\n👤 *Müşteri:* ${customer.name || 'Belirtilmedi'}\n📞 *Müşteri Tel:* ${customer.phone || 'Belirtilmedi'}\n📍 *Adres:* ${customer.address || 'Belirtilmedi'}\n🧹 *Hizmet:* ${serviceTitle}\n\nLütfen randevu saatinde adreste olmaya özen gösteriniz. İyi çalışmalar!`;
+                const employeeMsg = `📋 *YENİ GÖREV ATAMASI (OLiFA TEMİZLİK)*\n\nSayın *${emp.name}*,\nYeni bir temizlik görevi atanmıştır:\n\n📅 *Tarih:* ${formattedDateStr}\n⏰ *Saat Aralığı:* ${formattedSlotStr}\n👤 *Müşteri:* ${customer.name || 'Belirtilmedi'}\n📞 *Müşteri Tel:* ${customer.phone || 'Belirtilmedi'}\n🏠 *Adres:* ${customer.address || 'Belirtilmedi'}${locationText}\n🧹 *Hizmet:* ${serviceTitle}\n\nLütfen randevu saatinde adreste olmaya özen gösteriniz. İyi çalışmalar!`;
 
                 messageQueue.push({
                     jid: empJid,

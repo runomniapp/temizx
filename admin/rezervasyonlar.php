@@ -543,6 +543,16 @@ if ($openId > 0) {
                                         <a href="tel:<?php echo formatPhoneTelUrl($row['customer_phone']); ?>" class="btn btn-outline action-btn" data-action="call" style="color: var(--success); border-color: var(--success); padding: 6px 10px; font-size: 0.85rem;" title="Müşteriyi Ara (<?php echo e(formatPhoneDisplay($row['customer_phone'])); ?>)">
                                             <i class="fa-solid fa-phone-flip"></i>
                                         </a>
+                                        <?php if (!empty($row['customer_location'])): 
+                                             $mapsUrl = (strpos($row['customer_location'], 'http') === 0) 
+                                                 ? $row['customer_location'] 
+                                                 : "https://www.google.com/maps/search/?api=1&query=" . urlencode($row['customer_location']);
+                                         ?>
+                                             <!-- Konum Butonu -->
+                                             <a href="<?php echo e($mapsUrl); ?>" target="_blank" class="btn btn-outline action-btn" style="color: #ef4444; border-color: #fca5a5; padding: 6px 10px; font-size: 0.85rem;" title="Müşteri Konumuna Git (Google Maps)">
+                                                 <i class="fa-solid fa-location-dot"></i>
+                                             </a>
+                                         <?php endif; ?>
                                         <!-- Detay Butonu -->
                                         <button type="button" class="btn btn-outline action-btn" data-action="calendar" data-booking-id="<?php echo $row['id']; ?>" style="padding: 6px 10px; font-size: 0.85rem;" title="Program Takvimi & Personeller">
                                             <i class="fa-solid fa-calendar-week"></i>
@@ -829,6 +839,9 @@ if ($openId > 0) {
                         <label class="form-label" style="font-size: 0.8rem; margin-bottom: 4px; font-weight: 700;">Adres *</label>
                         <textarea name="customer_address" id="edit_booking_cust_address" class="form-control" rows="3" style="font-size: 0.9rem; padding: 10px 16px; border-radius: 14px; resize: none;" required></textarea>
                     </div>
+                    
+                    <!-- Müşteri Harita Konumu Butonu -->
+                    <div id="edit_booking_location_container" style="display: none;"></div>
                 </div>
             </div>
             
@@ -928,6 +941,32 @@ function openEditBooking(row) {
     document.getElementById("edit_booking_service_days").value = row.service_days || 1;
     document.getElementById("edit_booking_total_price").value = parseFloat(row.total_price || 0).toFixed(2);
     document.getElementById("edit_booking_status").value = row.status;
+    
+    const locContainer = document.getElementById("edit_booking_location_container");
+    if (locContainer) {
+        if (row.customer_location && row.customer_location.trim() !== "") {
+            let locUrl = row.customer_location.startsWith("http") 
+                ? row.customer_location 
+                : "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(row.customer_location);
+            locContainer.innerHTML = `
+                <div style="margin-top: 10px; background: #fef2f2; border: 1px solid #fecaca; padding: 12px 16px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <strong style="font-size: 0.88rem; color: #991b1b; display: block;">
+                            <i class="fa-solid fa-location-dot" style="color: #ef4444; margin-right: 6px;"></i> Müşteri Harita Konumu
+                        </strong>
+                        <span style="font-size: 0.8rem; color: #7f1d1d;">${row.customer_location}</span>
+                    </div>
+                    <a href="${locUrl}" target="_blank" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem; background: #ef4444; border-color: #ef4444; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-map-location-dot"></i> Haritada Aç
+                    </a>
+                </div>
+            `;
+            locContainer.style.display = "block";
+        } else {
+            locContainer.style.display = "none";
+            locContainer.innerHTML = "";
+        }
+    }
     
     renderBookingCategoryPills(parseInt(row.category_id), parseInt(row.subcategory_id || 0));
     
