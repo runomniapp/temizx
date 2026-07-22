@@ -344,7 +344,7 @@ class WhatsAppService {
                 return ['success' => true];
             }
 
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             return ['success' => false, 'message' => $e->getMessage()];
         }
     }

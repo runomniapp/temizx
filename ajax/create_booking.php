@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/helper.php';
 require_once __DIR__ . '/../classes/Booking.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -61,9 +62,13 @@ try {
     
     $bookingId = $bookingModel->createBooking($bookingData);
 
-    // Yöneticiye WhatsApp yeni teklif bildirimi gönder
-    require_once __DIR__ . '/../classes/WhatsAppService.php';
-    WhatsAppService::sendNewBookingAdminNotification($bookingId);
+    // Yöneticiye WhatsApp yeni teklif bildirimi gönder (Hataya karşı korumalı)
+    try {
+        require_once __DIR__ . '/../classes/WhatsAppService.php';
+        WhatsAppService::sendNewBookingAdminNotification($bookingId);
+    } catch (\Throwable $ntfErr) {
+        error_log("WhatsApp Admin Notification Error: " . $ntfErr->getMessage());
+    }
     
     echo json_encode([
         'success' => true,
